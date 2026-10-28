@@ -3,6 +3,8 @@ let warehouses = [];
 let scene, camera, renderer, controls;
 let truckMeshes = [];
 let palletMeshes = [];
+let raycaster, mouse;
+let selectedPallet = null;
 
 // Bilico dimensions (in meters)
 const TRUCK_LENGTH = 13.6;
@@ -349,6 +351,18 @@ function initThreeJS() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+    controls.enablePan = true;
+    controls.maxPolarAngle = Math.PI / 2; // Prevent going below ground
+    
+    // Raycaster for click detection
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+    
+    // Click handler
+    renderer.domElement.addEventListener('click', onMouseClick, false);
+    
+    // Keyboard shortcuts for navigation
+    document.addEventListener('keydown', onKeyDown);
     
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -377,6 +391,116 @@ function initThreeJS() {
     });
 }
 
+// Handle mouse click on pallets
+function onMouseClick(event) {
+    const container = document.getElementById('threeContainer');
+    const rect = renderer.domElement.getBoundingClientRect();
+    
+    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    raycaster.setFromCamera(mouse, camera);
+    
+    // Get all pallet meshes
+    const palletMeshesOnly = palletMeshes.filter(mesh => mesh.isMesh);
+    const intersects = raycaster.intersectObjects(palletMeshesOnly);
+    
+    // Remove previous selection highlight
+    if (selectedPallet) {
+        selectedPallet.material.emissive.setHex(0x000000);
+    }
+    
+    if (intersects.length > 0) {
+        const clickedMesh = intersects[0].object;
+        selectedPallet = clickedMesh;
+        
+        // Highlight selected pallet
+        clickedMesh.material.emissive.setHex(0x333333);
+        
+        // Show dimensions in UI
+        const palletData = clickedMesh.userData;
+        if (palletData) {
+            const dimensions = `${palletData.length.toFixed(2)}m × ${palletData.width.toFixed(2)}m × ${palletData.height.toFixed(2)}m`;
+            const weight = `${palletData.weight}kg`;
+            const warehouse = palletData.warehouseName || '';
+            
+            alert(`📦 Pallet Selezionato\n\nDimensioni: ${dimensions}\nPeso: ${weight}\nMagazzino: ${warehouse}`);
+        }
+    } else {
+        selectedPallet = null;
+    }
+}
+
+// Handle keyboard navigation
+function onKeyDown(event) {
+    if (!window.truckPositions || window.truckPositions.length === 0) return;
+    
+    const spacing = TRUCK_LENGTH + 5;
+    
+    switch(event.key) {
+        case 'ArrowLeft':
+            // Move camera to previous truck
+            const currentX = controls.target.x;
+            const currentIndex = window.truckPositions.findIndex(t => Math.abs(t.x - currentX) < spacing / 2);
+            
+            if (currentIndex > 0) {
+                const prevTruck = window.truckPositions[currentIndex - 1];
+                animateCameraTo(prevTruck.x);
+            }
+            break;
+            
+        case 'ArrowRight':
+            // Move camera to next truck
+            const currentX2 = controls.target.x;
+            const currentIndex2 = window.truckPositions.findIndex(t => Math.abs(t.x - currentX2) < spacing / 2);
+            
+            if (currentIndex2 < window.truckPositions.length - 1) {
+                const nextTruck = window.truckPositions[currentIndex2 + 1];
+                animateCameraTo(nextTruck.x);
+            }
+            break;
+            
+        case 'Home':
+            // Reset to overview
+            const totalWidth = window.truckPositions.length * spacing;
+            animateCameraTo(totalWidth / 2, true);
+            break;
+    }
+}
+
+// Animate camera to position
+function animateCameraTo(targetX, isOverview = false) {
+    const startY = camera.position.y;
+    const startZ = camera.position.z;
+    const targetY = isOverview ? 25 : 15;
+    const targetZ = isOverview ? 30 : 20;
+    
+    const duration = 500;
+    const startTime = Date.now();
+    
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease function
+        const ease = t => t * (2 - t);
+        const easedProgress = ease(progress);
+        
+        camera.position.x = targetX + 10;
+        camera.position.y = startY + (targetY - startY) * easedProgress;
+        camera.position.z = startZ + (targetZ - startZ) * easedProgress;
+        
+        controls.target.set(targetX, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
+        controls.update();
+        
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        }
+    }
+    
+    animate();
+}
+
 // Clear all objects from scene
 function clearScene() {
     const objectsToRemove = [];
@@ -396,7 +520,7 @@ function clearScene() {
 }
 
 // Draw a truck bed at a specific position
-function drawTruckBed(positionX, offsetY, label) {
+function drawTruckBed(positionX, offsetY, label, linearMeters) {
     const group = new THREE.Group();
     
     // Truck bed (wireframe)
@@ -425,7 +549,7 @@ function drawTruckBed(positionX, offsetY, label) {
     gridHelper.position.set(TRUCK_LENGTH / 2, 0, TRUCK_WIDTH / 2);
     group.add(gridHelper);
     
-    // Add label
+    // Add warehouse label
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     canvas.width = 256;
@@ -442,6 +566,25 @@ function drawTruckBed(positionX, offsetY, label) {
     sprite.scale.set(4, 1, 1);
     group.add(sprite);
     
+    // Add linear meters label
+    const linearCanvas = document.createElement('canvas');
+    const linearContext = linearCanvas.getContext('2d');
+    linearCanvas.width = 256;
+    linearCanvas.height = 64;
+    linearContext.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    linearContext.fillRect(0, 0, 256, 64);
+    linearContext.fillStyle = '#10b981';
+    linearContext.font = 'bold 28px Arial';
+    linearContext.textAlign = 'center';
+    linearContext.fillText(`📏 ${linearMeters.toFixed(1)}m lineari`, 128, 40);
+    
+    const linearTexture = new THREE.CanvasTexture(linearCanvas);
+    const linearSpriteMaterial = new THREE.SpriteMaterial({ map: linearTexture });
+    const linearSprite = new THREE.Sprite(linearSpriteMaterial);
+    linearSprite.position.set(TRUCK_LENGTH / 2, TRUCK_HEIGHT + 2.5, TRUCK_WIDTH / 2);
+    linearSprite.scale.set(4, 1, 1);
+    group.add(linearSprite);
+    
     group.position.set(positionX, offsetY, 0);
     scene.add(group);
     truckMeshes.push(group);
@@ -449,7 +592,7 @@ function drawTruckBed(positionX, offsetY, label) {
     return group;
 }
 
-// Draw a pallet with dimensions label
+// Draw a pallet without dimensions label
 function drawPallet(pallet, index, offset) {
     const geometry = new THREE.BoxGeometry(
         pallet.rotated ? pallet.width : pallet.length,
@@ -473,6 +616,16 @@ function drawPallet(pallet, index, offset) {
     );
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    
+    // Store pallet data for click detection
+    mesh.userData = {
+        length: pallet.length,
+        width: pallet.width,
+        height: pallet.height,
+        weight: pallet.weight,
+        warehouseName: pallet.warehouseName
+    };
+    
     scene.add(mesh);
     palletMeshes.push(mesh);
     
@@ -483,31 +636,6 @@ function drawPallet(pallet, index, offset) {
     edgeMesh.position.copy(mesh.position);
     scene.add(edgeMesh);
     palletMeshes.push(edgeMesh);
-    
-    // Add dimensions label
-    const dimensions = `${(pallet.rotated ? pallet.width : pallet.length).toFixed(1)}×${(pallet.rotated ? pallet.length : pallet.width).toFixed(1)}×${pallet.height.toFixed(1)}`;
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 128;
-    canvas.height = 64;
-    context.fillStyle = 'rgba(0,0,0,0.7)';
-    context.fillRect(0, 0, 128, 64);
-    context.fillStyle = 'white';
-    context.font = 'bold 14px Arial';
-    context.textAlign = 'center';
-    context.fillText(dimensions, 64, 36);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(spriteMaterial);
-    sprite.position.set(
-        mesh.position.x,
-        mesh.position.y + pallet.height / 2 + 0.3,
-        mesh.position.z
-    );
-    sprite.scale.set(2, 1, 1);
-    scene.add(sprite);
-    palletMeshes.push(sprite);
 }
 
 // Main optimization and visualization function
@@ -541,10 +669,20 @@ function optimizeAndVisualize() {
         
         // Draw truck bed
         const truckOffset = { x: offsetX, y: 0 };
-        drawTruckBed(offsetX, 0, `🏭 ${warehouseName}`);
         
         // Run packing algorithm for this warehouse
         const { placedPallets, unplacedPallets } = packPallets(warehousePallets);
+        
+        // Calculate linear meters occupied
+        let maxLinearMeter = 0;
+        placedPallets.forEach(p => {
+            const endPosition = p.x + (p.rotated ? p.width : p.length);
+            if (endPosition > maxLinearMeter) {
+                maxLinearMeter = endPosition;
+            }
+        });
+        
+        drawTruckBed(offsetX, 0, `🏭 ${warehouseName}`, maxLinearMeter);
         
         // Draw placed pallets
         placedPallets.forEach((pallet, i) => {
@@ -555,10 +693,22 @@ function optimizeAndVisualize() {
     });
     
     // Adjust camera to see all trucks
-    const totalWidth = Object.keys(palletsByWarehouse).length * spacing;
-    camera.position.set(totalWidth / 2 + 10, 15, 20);
+    const numTrucks = Object.keys(palletsByWarehouse).length;
+    const totalWidth = numTrucks * spacing;
+    
+    // Better camera positioning for multiple trucks
+    camera.position.set(totalWidth / 2, 25, 30);
     controls.target.set(totalWidth / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
     controls.update();
+    
+    // Store truck positions for quick navigation
+    window.truckPositions = [];
+    Object.keys(palletsByWarehouse).forEach((warehouseId, index) => {
+        window.truckPositions.push({
+            x: index * spacing + TRUCK_LENGTH / 2,
+            name: warehouses.find(w => w.id === parseInt(warehouseId))?.name || `M${warehouseId}`
+        });
+    });
     
     // Display results
     displayResults(palletData);
@@ -597,7 +747,137 @@ function displayResults(palletData) {
     resultsContent.innerHTML = resultsHTML;
 }
 
-// Generate combinations (placeholder for now)
+// Generate combinations for optimal transport
 function generateCombinations() {
-    alert('Funzione di generazione combinazioni in sviluppo...');
+    const palletData = collectAllPalletData();
+    
+    if (palletData.length === 0) {
+        alert('Inserisci almeno un pallet valido');
+        return;
+    }
+    
+    if (warehouses.length < 2) {
+        alert('Devi avere almeno 2 magazzini per generare combinazioni');
+        return;
+    }
+    
+    // Group pallets by warehouse
+    const palletsByWarehouse = {};
+    palletData.forEach(p => {
+        if (!palletsByWarehouse[p.warehouseId]) {
+            palletsByWarehouse[p.warehouseId] = [];
+        }
+        palletsByWarehouse[p.warehouseId].push(p);
+    });
+    
+    // Generate all possible combinations
+    const combinations = [];
+    const warehouseIds = Object.keys(palletsByWarehouse);
+    
+    // Try combinations of 2, 3, etc. warehouses
+    for (let size = 2; size <= warehouseIds.length; size++) {
+        const combinationsOfSize = getCombinations(warehouseIds, size);
+        
+        combinationsOfSize.forEach(combination => {
+            // Combine all pallets from these warehouses in order
+            const combinedPallets = [];
+            combination.forEach(whId => {
+                palletsByWarehouse[whId].forEach(p => {
+                    combinedPallets.push(p);
+                });
+            });
+            
+            // Try to pack all pallets in one truck
+            const { placedPallets, unplacedPallets } = packPallets(combinedPallets);
+            
+            if (unplacedPallets.length === 0) {
+                // All pallets fit - calculate stats
+                const totalWeight = combinedPallets.reduce((sum, p) => sum + p.weight, 0);
+                const maxLinearMeter = placedPallets.reduce((max, p) => {
+                    const endPosition = p.x + (p.rotated ? p.width : p.length);
+                    return Math.max(max, endPosition);
+                }, 0);
+                
+                const warehouseNames = combination.map(id => 
+                    warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
+                ).join(' + ');
+                
+                combinations.push({
+                    warehouses: warehouseNames,
+                    numPallets: combinedPallets.length,
+                    totalWeight: totalWeight,
+                    linearMeters: maxLinearMeter,
+                    savedTrucks: size - 1
+                });
+            }
+        });
+    }
+    
+    // Sort by most trucks saved, then by linear meters
+    combinations.sort((a, b) => {
+        if (b.savedTrucks !== a.savedTrucks) {
+            return b.savedTrucks - a.savedTrucks;
+        }
+        return a.linearMeters - b.linearMeters;
+    });
+    
+    // Display results
+    displayCombinations(combinations);
+}
+
+// Get all combinations of size k from array
+function getCombinations(arr, k) {
+    const result = [];
+    
+    function combine(start, combo) {
+        if (combo.length === k) {
+            result.push([...combo]);
+            return;
+        }
+        
+        for (let i = start; i < arr.length; i++) {
+            combo.push(arr[i]);
+            combine(i + 1, combo);
+            combo.pop();
+        }
+    }
+    
+    combine(0, []);
+    return result;
+}
+
+// Display combination results
+function displayCombinations(combinations) {
+    const resultsDiv = document.getElementById('results');
+    const resultsContent = document.getElementById('resultsContent');
+    const errorsDiv = document.getElementById('errors');
+    const errorsContent = document.getElementById('errorsContent');
+    
+    resultsDiv.classList.remove('hidden');
+    errorsDiv.classList.add('hidden');
+    
+    if (combinations.length === 0) {
+        resultsContent.innerHTML = `
+            <p>Nessuna combinazione valida trovata.</p>
+            <p class="text-sm mt-2">I magazzini non possono essere combinati in un unico mezzo.</p>
+        `;
+        return;
+    }
+    
+    let html = '<p class="font-semibold mb-3">Combinazioni ottimali trovate:</p>';
+    
+    combinations.slice(0, 5).forEach((combo, index) => {
+        html += `
+            <div class="bg-white/10 rounded-lg p-3 mb-2">
+                <p class="font-semibold text-green-300">💡 Opzione ${index + 1}</p>
+                <p><strong>Magazzini:</strong> ${combo.warehouses}</p>
+                <p><strong>Pallet totali:</strong> ${combo.numPallets}</p>
+                <p><strong>Peso:</strong> ${(combo.totalWeight / 1000).toFixed(2)}t</p>
+                <p><strong>Metri lineari:</strong> ${combo.linearMeters.toFixed(1)}m</p>
+                <p class="text-green-300"><strong>Risparmio:</strong> ${combo.savedTrucks} trasporto/i</p>
+            </div>
+        `;
+    });
+    
+    resultsContent.innerHTML = html;
 }
