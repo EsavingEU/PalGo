@@ -151,6 +151,9 @@ function collectAllPalletData() {
             const stackable = document.getElementById(`stackable-${warehouse.id}-${rowIndex}`).checked;
             
             if (length > 0 && width > 0 && height > 0 && weight > 0 && quantity > 0) {
+                // Weight is total weight for this row, divide by quantity for individual pallet
+                const individualWeight = weight / quantity;
+                
                 for (let i = 0; i < quantity; i++) {
                     data.push({
                         id: `${warehouse.id}-${rowIndex}-${i}`,
@@ -159,7 +162,8 @@ function collectAllPalletData() {
                         length,
                         width,
                         height,
-                        weight,
+                        weight: individualWeight,
+                        totalWeight: weight,
                         stackable
                     });
                 }
@@ -263,55 +267,47 @@ function packPallets(palletData) {
         }
     }
     
-    // Try to place each pallet
+    // Try to place each pallet with orientation optimization
     for (const pallet of sortedPallets) {
         let placed = false;
+        let bestPosition = null;
+        let bestOrientation = false;
+        let bestLinearPosition = Infinity;
         
-        // Try both orientations
+        // Try both orientations and find the one that minimizes linear space
         for (const rotated of [false, true]) {
-            if (placed) break;
+            const pLength = rotated ? pallet.width : pallet.length;
             
-            // Try to place at the bottom (z=0) first
-            if (pallet.stackable || !placed) {
-                for (let x = 0; x <= TRUCK_LENGTH - (rotated ? pallet.width : pallet.length); x += cellSize) {
-                    if (placed) break;
-                    for (let y = 0; y <= TRUCK_WIDTH - (rotated ? pallet.length : pallet.width); y += cellSize) {
-                        if (canPlace(pallet, x, y, 0, rotated)) {
-                            markOccupied(pallet, x, y, 0, rotated);
-                            placedPallets.push({
-                                ...pallet,
-                                x,
-                                y,
-                                z: 0,
-                                rotated
-                            });
+            // Try to place at the bottom (z=0)
+            for (let x = 0; x <= TRUCK_LENGTH - pLength; x += cellSize) {
+                for (let y = 0; y <= TRUCK_WIDTH - (rotated ? pallet.length : pallet.width); y += cellSize) {
+                    if (canPlace(pallet, x, y, 0, rotated)) {
+                        const linearPosition = x + pLength;
+                        if (linearPosition < bestLinearPosition) {
+                            bestLinearPosition = linearPosition;
+                            bestPosition = { x, y, z: 0 };
+                            bestOrientation = rotated;
                             placed = true;
-                            break;
                         }
                     }
                 }
             }
             
             // If stackable, try to place on top of other pallets
-            if (pallet.stackable && !placed) {
+            if (pallet.stackable) {
                 for (const placedPallet of placedPallets) {
-                    if (placed) break;
                     const topZ = placedPallet.z + placedPallet.height;
                     
-                    for (let x = placedPallet.x; x <= placedPallet.x + (placedPallet.rotated ? placedPallet.width : placedPallet.length) - (rotated ? pallet.width : pallet.length); x += cellSize) {
-                        if (placed) break;
+                    for (let x = placedPallet.x; x <= placedPallet.x + (placedPallet.rotated ? placedPallet.width : placedPallet.length) - pLength; x += cellSize) {
                         for (let y = placedPallet.y; y <= placedPallet.y + (placedPallet.rotated ? placedPallet.length : placedPallet.width) - (rotated ? pallet.length : pallet.width); y += cellSize) {
                             if (canPlace(pallet, x, y, topZ, rotated)) {
-                                markOccupied(pallet, x, y, topZ, rotated);
-                                placedPallets.push({
-                                    ...pallet,
-                                    x,
-                                    y,
-                                    z: topZ,
-                                    rotated
-                                });
-                                placed = true;
-                                break;
+                                const linearPosition = x + pLength;
+                                if (linearPosition < bestLinearPosition) {
+                                    bestLinearPosition = linearPosition;
+                                    bestPosition = { x, y, z: topZ };
+                                    bestOrientation = rotated;
+                                    placed = true;
+                                }
                             }
                         }
                     }
@@ -319,7 +315,16 @@ function packPallets(palletData) {
             }
         }
         
-        if (!placed) {
+        if (placed && bestPosition) {
+            markOccupied(pallet, bestPosition.x, bestPosition.y, bestPosition.z, bestOrientation);
+            placedPallets.push({
+                ...pallet,
+                x: bestPosition.x,
+                y: bestPosition.y,
+                z: bestPosition.z,
+                rotated: bestOrientation
+            });
+        } else {
             unplacedPallets.push(pallet);
         }
     }
@@ -421,7 +426,7 @@ function onMouseClick(event) {
         const palletData = clickedMesh.userData;
         if (palletData) {
             const dimensions = `${palletData.length.toFixed(2)}m × ${palletData.width.toFixed(2)}m × ${palletData.height.toFixed(2)}m`;
-            const weight = `${palletData.weight}kg`;
+            const weight = `${palletData.totalWeight.toFixed(1)}kg`;
             const warehouse = palletData.warehouseName || '';
             
             alert(`📦 Pallet Selezionato\n\nDimensioni: ${dimensions}\nPeso: ${weight}\nMagazzino: ${warehouse}`);
@@ -623,6 +628,7 @@ function drawPallet(pallet, index, offset) {
         width: pallet.width,
         height: pallet.height,
         weight: pallet.weight,
+        totalWeight: pallet.totalWeight || pallet.weight,
         warehouseName: pallet.warehouseName
     };
     
@@ -724,6 +730,20 @@ function displayResults(palletData) {
     resultsDiv.classList.remove('hidden');
     errorsDiv.classList.add('hidden');
     
+    // Check if this is a combination (no warehouse grouping)
+    const hasWarehouses = palletData.some(p => p.warehouseName);
+    
+    if (!hasWarehouses) {
+        // Single combined truck view
+        const totalWeight = palletData.reduce((sum, p) => sum + p.weight, 0);
+        const totalVolume = palletData.reduce((sum, p) => sum + p.length * p.width * p.height, 0);
+        
+        resultsContent.innerHTML = `
+            <p><strong>Totale combinato:</strong> ${palletData.length} pallet, ${(totalWeight / 1000).toFixed(2)}t, ${totalVolume.toFixed(2)}m³</p>
+        `;
+        return;
+    }
+    
     // Group by warehouse
     const byWarehouse = {};
     palletData.forEach(p => {
@@ -736,7 +756,18 @@ function displayResults(palletData) {
     let resultsHTML = '';
     Object.keys(byWarehouse).forEach(warehouseName => {
         const pallets = byWarehouse[warehouseName];
-        const totalWeight = pallets.reduce((sum, p) => sum + p.weight, 0);
+        
+        // Use totalWeight to avoid double counting for multiple pallets of same type
+        const uniqueRows = new Set();
+        const totalWeight = pallets.reduce((sum, p) => {
+            const rowKey = `${p.warehouseId}-${p.id.split('-')[1]}`;
+            if (!uniqueRows.has(rowKey)) {
+                uniqueRows.add(rowKey);
+                return sum + (p.totalWeight || p.weight);
+            }
+            return sum;
+        }, 0);
+        
         const totalVolume = pallets.reduce((sum, p) => sum + p.length * p.width * p.height, 0);
         
         resultsHTML += `
@@ -792,7 +823,17 @@ function generateCombinations() {
             
             if (unplacedPallets.length === 0) {
                 // All pallets fit - calculate stats
-                const totalWeight = combinedPallets.reduce((sum, p) => sum + p.weight, 0);
+                // Use totalWeight (original row weight) to avoid double counting
+                const uniqueRows = new Set();
+                const totalWeight = combinedPallets.reduce((sum, p) => {
+                    const rowKey = `${p.warehouseId}-${p.id.split('-')[1]}`;
+                    if (!uniqueRows.has(rowKey)) {
+                        uniqueRows.add(rowKey);
+                        return sum + (p.totalWeight || p.weight);
+                    }
+                    return sum;
+                }, 0);
+                
                 const maxLinearMeter = placedPallets.reduce((max, p) => {
                     const endPosition = p.x + (p.rotated ? p.width : p.length);
                     return Math.max(max, endPosition);
@@ -868,8 +909,8 @@ function displayCombinations(combinations) {
     
     combinations.slice(0, 5).forEach((combo, index) => {
         html += `
-            <div class="bg-white/10 rounded-lg p-3 mb-2">
-                <p class="font-semibold text-green-300">💡 Opzione ${index + 1}</p>
+            <div class="bg-white/10 rounded-lg p-3 mb-2 cursor-pointer hover:bg-white/20 transition" onclick="visualizeCombination(${index})">
+                <p class="font-semibold text-green-300">💡 Opzione ${index + 1} (clicca per visualizzare)</p>
                 <p><strong>Magazzini:</strong> ${combo.warehouses}</p>
                 <p><strong>Pallet totali:</strong> ${combo.numPallets}</p>
                 <p><strong>Peso:</strong> ${(combo.totalWeight / 1000).toFixed(2)}t</p>
@@ -880,4 +921,65 @@ function displayCombinations(combinations) {
     });
     
     resultsContent.innerHTML = html;
+    
+    // Store combinations for visualization
+    window.combinations = combinations;
+}
+
+// Visualize a specific combination
+function visualizeCombination(index) {
+    const combo = window.combinations[index];
+    if (!combo) return;
+    
+    // Clear previous visualization
+    clearScene();
+    
+    // Get pallet data for this combination
+    const palletData = collectAllPalletData();
+    
+    // Parse warehouse names from combo
+    const warehouseNames = combo.warehouses.split(' + ');
+    const warehouseIds = warehouseNames.map(name => {
+        const warehouse = warehouses.find(w => w.name === name);
+        return warehouse ? warehouse.id : null;
+    }).filter(id => id !== null);
+    
+    // Combine pallets from these warehouses in order
+    const combinedPallets = [];
+    warehouseIds.forEach(whId => {
+        const warehousePallets = palletData.filter(p => p.warehouseId === whId);
+        combinedPallets.push(...warehousePallets);
+    });
+    
+    // Pack all pallets in one truck
+    const { placedPallets, unplacedPallets } = packPallets(combinedPallets);
+    
+    // Calculate linear meters
+    let maxLinearMeter = 0;
+    placedPallets.forEach(p => {
+        const endPosition = p.x + (p.rotated ? p.width : p.length);
+        if (endPosition > maxLinearMeter) {
+            maxLinearMeter = endPosition;
+        }
+    });
+    
+    // Draw single truck with combined warehouses
+    drawTruckBed(0, 0, `🚚 ${combo.warehouses}`, maxLinearMeter);
+    
+    // Draw all pallets
+    const truckOffset = { x: 0, y: 0 };
+    placedPallets.forEach((pallet, i) => {
+        drawPallet(pallet, i, truckOffset);
+    });
+    
+    // Adjust camera for single truck
+    camera.position.set(TRUCK_LENGTH / 2 + 10, 15, 20);
+    controls.target.set(TRUCK_LENGTH / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
+    controls.update();
+    
+    // Display results
+    displayResults(combinedPallets);
+    
+    // Show alert
+    alert(`Visualizzazione combinazione: ${combo.warehouses}\n\nMetri lineari: ${maxLinearMeter.toFixed(1)}m\nPallet posizionati: ${placedPallets.length}/${combinedPallets.length}`);
 }
