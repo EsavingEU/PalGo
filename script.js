@@ -30,6 +30,10 @@ function addPalletRow() {
         </div>
         <div class="input-group">
             <div>
+                <div class="input-label">Quantità</div>
+                <input type="number" id="quantity-${rowIndex}" placeholder="1" step="1" min="1" value="1">
+            </div>
+            <div>
                 <div class="input-label">Lunghezza (m)</div>
                 <input type="number" id="length-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
             </div>
@@ -76,21 +80,26 @@ function collectPalletData() {
     const rows = document.querySelectorAll('.pallet-row');
     
     rows.forEach((row, index) => {
+        const quantity = parseInt(document.getElementById(`quantity-${index}`).value) || 1;
         const length = parseFloat(document.getElementById(`length-${index}`).value) || 0;
         const width = parseFloat(document.getElementById(`width-${index}`).value) || 0;
         const height = parseFloat(document.getElementById(`height-${index}`).value) || 0;
         const weight = parseFloat(document.getElementById(`weight-${index}`).value) || 0;
         const stackable = document.getElementById(`stackable-${index}`).checked;
         
-        if (length > 0 && width > 0 && height > 0 && weight > 0) {
-            data.push({
-                id: index,
-                length,
-                width,
-                height,
-                weight,
-                stackable
-            });
+        if (length > 0 && width > 0 && height > 0 && weight > 0 && quantity > 0) {
+            // Add multiple copies of the same pallet
+            for (let i = 0; i < quantity; i++) {
+                data.push({
+                    id: `${index}-${i}`,
+                    originalRow: index,
+                    length,
+                    width,
+                    height,
+                    weight,
+                    stackable
+                });
+            }
         }
     });
     
@@ -426,9 +435,19 @@ function optimizeAndVisualize() {
     }
     
     if (unplacedPallets.length > 0) {
-        issues.push(`⚠️ ${unplacedPallets.length} pallet non ci stanno:`);
+        // Group unplaced pallets by original row
+        const unplacedGroups = {};
         unplacedPallets.forEach(p => {
-            issues.push(`   - Pallet #${p.id + 1}: ${p.length}m × ${p.width}m × ${p.height}m (${p.weight}kg)`);
+            const key = `${p.length}x${p.width}x${p.height}`;
+            if (!unplacedGroups[key]) {
+                unplacedGroups[key] = { count: 0, ...p };
+            }
+            unplacedGroups[key].count++;
+        });
+        
+        issues.push(`⚠️ ${unplacedPallets.length} pallet non ci stanno:`);
+        Object.values(unplacedGroups).forEach(group => {
+            issues.push(`   - ${group.count} pallet: ${group.length}m × ${group.width}m × ${group.height}m (${group.weight}kg)`);
         });
     }
     
