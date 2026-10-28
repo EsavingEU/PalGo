@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PalGo - Ottimizzatore Bilico Centinato</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-5xl font-bold text-white mb-2">PalGo</h1>
+            <p class="text-blue-300 text-lg">Ottimizzatore Bilico Centinato 3D</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Form Pallet -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
+                    <span class="bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">1</span>
+                    Inserisci Pallet
+                </h2>
+
+                <div id="palletForm" class="space-y-4">
+                    <!-- Pallet rows will be added here -->
+                </div>
+
+                <button onclick="addPalletRow()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Aggiungi Pallet
+                </button>
+
+                <div class="mt-6 p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
+                    <h3 class="text-yellow-300 font-semibold mb-2">Limiti Bilico</h3>
+                    <ul class="text-yellow-200 text-sm space-y-1">
+                        <li>• Dimensioni: 13.6m × 2.5m</li>
+                        <li>• Altezza massima: 2.60m</li>
+                        <li>• Peso massimo: 25t</li>
+                    </ul>
+                </div>
+
+                <button onclick="optimizeAndVisualize()" class="mt-6 w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 text-lg">
+                    🚀 Ottimizza e Visualizza
+                </button>
+            </div>
+
+            <!-- 3D Visualization -->
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+                <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
+                    <span class="bg-green-500 rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">2</span>
+                    Visualizzazione 3D
+                </h2>
+
+                <div id="threeContainer" class="w-full h-[500px] bg-slate-800 rounded-xl overflow-hidden"></div>
+
+                <div id="results" class="mt-6 space-y-4 hidden">
+                    <div class="bg-green-500/20 rounded-lg p-4 border border-green-500/30">
+                        <h3 class="text-green-300 font-semibold mb-2">Risultati</h3>
+                        <div id="resultsContent" class="text-green-200 text-sm"></div>
+                    </div>
+
+                    <div id="errors" class="bg-red-500/20 rounded-lg p-4 border border-red-500/30 hidden">
+                        <h3 class="text-red-300 font-semibold mb-2">⚠️ Problemi</h3>
+                        <div id="errorsContent" class="text-red-200 text-sm"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
