@@ -1,7 +1,8 @@
 // Global variables
-let pallets = [];
+let warehouses = [];
 let scene, camera, renderer, controls;
-let truckMesh;
+let truckMeshes = [];
+let palletMeshes = [];
 
 // Bilico dimensions (in meters)
 const TRUCK_LENGTH = 13.6;
@@ -9,101 +10,176 @@ const TRUCK_WIDTH = 2.5;
 const TRUCK_HEIGHT = 2.6;
 const MAX_WEIGHT = 25000; // 25 tons in kg
 
-// Initialize with one pallet row
+// Color palette for same-sized pallets
+const COLOR_PALETTE = [
+    0x3b82f6, // Blue
+    0x10b981, // Emerald
+    0xf59e0b, // Amber
+    0xef4444, // Red
+    0x8b5cf6, // Violet
+    0x06b6d4, // Cyan
+    0xf97316, // Orange
+    0x84cc16, // Lime
+    0xec4899, // Pink
+    0x6366f1, // Indigo
+];
+
+// Initialize with one warehouse
 document.addEventListener('DOMContentLoaded', function() {
-    addPalletRow();
+    addWarehouse();
     initThreeJS();
 });
 
-// Add a new pallet row
-function addPalletRow() {
-    const form = document.getElementById('palletForm');
-    const rowIndex = pallets.length;
+// Add a new warehouse section
+function addWarehouse() {
+    const form = document.getElementById('warehousesForm');
+    const warehouseIndex = warehouses.length;
+    
+    const warehouse = document.createElement('div');
+    warehouse.className = 'warehouse-section bg-white/5 rounded-xl p-4 border border-white/10';
+    warehouse.id = `warehouse-${warehouseIndex}`;
+    warehouse.innerHTML = `
+        <div class="flex justify-between items-center mb-3">
+            <span class="text-white font-semibold text-lg">🏭 Magazzino ${String.fromCharCode(65 + warehouseIndex)}</span>
+            <button onclick="removeWarehouse(${warehouseIndex})" class="remove-btn">Rimuovi</button>
+        </div>
+        <div id="palletForm-${warehouseIndex}" class="space-y-3">
+            <!-- Pallet rows will be added here -->
+        </div>
+        <button onclick="addPalletRow(${warehouseIndex})" class="mt-3 w-full bg-blue-600/50 hover:bg-blue-600/70 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-sm">
+            + Aggiungi Pallet
+        </button>
+    `;
+    
+    form.appendChild(warehouse);
+    warehouses.push({ id: warehouseIndex, name: String.fromCharCode(65 + warehouseIndex) });
+    
+    // Add one pallet row by default
+    addPalletRow(warehouseIndex);
+}
+
+// Remove a warehouse
+function removeWarehouse(index) {
+    const warehouse = document.getElementById(`warehouse-${index}`);
+    if (warehouse) {
+        warehouse.remove();
+        warehouses = warehouses.filter(w => w.id !== index);
+        // Re-index remaining warehouses
+        document.querySelectorAll('.warehouse-section').forEach((wh, i) => {
+            wh.querySelector('span').textContent = `🏭 Magazzino ${String.fromCharCode(65 + i)}`;
+            wh.querySelector('.remove-btn').onclick = () => removeWarehouse(i);
+            wh.id = `warehouse-${i}`;
+        });
+    }
+}
+
+// Add a new pallet row to a specific warehouse
+function addPalletRow(warehouseIndex) {
+    const form = document.getElementById(`palletForm-${warehouseIndex}`);
+    const rowIndex = document.querySelectorAll(`#palletForm-${warehouseIndex} .pallet-row`).length;
     
     const row = document.createElement('div');
     row.className = 'pallet-row';
-    row.id = `pallet-${rowIndex}`;
+    row.id = `pallet-${warehouseIndex}-${rowIndex}`;
     row.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-            <span class="text-white font-semibold">Pallet #${rowIndex + 1}</span>
-            <button onclick="removePalletRow(${rowIndex})" class="remove-btn">Rimuovi</button>
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-white/80 text-sm">Pallet #${rowIndex + 1}</span>
+            <button onclick="removePalletRow(${warehouseIndex}, ${rowIndex})" class="remove-btn text-xs py-1 px-2">X</button>
         </div>
         <div class="input-group">
             <div>
                 <div class="input-label">Quantità</div>
-                <input type="number" id="quantity-${rowIndex}" placeholder="1" step="1" min="1" value="1">
+                <input type="number" id="quantity-${warehouseIndex}-${rowIndex}" placeholder="1" step="1" min="1" value="1">
             </div>
             <div>
                 <div class="input-label">Lunghezza (m)</div>
-                <input type="number" id="length-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
+                <input type="number" id="length-${warehouseIndex}-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
             </div>
             <div>
                 <div class="input-label">Larghezza (m)</div>
-                <input type="number" id="width-${rowIndex}" placeholder="0.8" step="0.01" min="0.1" value="0.8">
+                <input type="number" id="width-${warehouseIndex}-${rowIndex}" placeholder="0.8" step="0.01" min="0.1" value="0.8">
             </div>
             <div>
                 <div class="input-label">Altezza (m)</div>
-                <input type="number" id="height-${rowIndex}" placeholder="1.5" step="0.01" min="0.1" value="1.5">
+                <input type="number" id="height-${warehouseIndex}-${rowIndex}" placeholder="1.5" step="0.01" min="0.1" value="1.5">
             </div>
             <div>
                 <div class="input-label">Peso (kg)</div>
-                <input type="number" id="weight-${rowIndex}" placeholder="500" step="1" min="1" value="500">
+                <input type="number" id="weight-${warehouseIndex}-${rowIndex}" placeholder="500" step="1" min="1" value="500">
             </div>
             <div class="checkbox-group">
-                <input type="checkbox" id="stackable-${rowIndex}" checked>
-                <label for="stackable-${rowIndex}">Sovrapponibile</label>
+                <input type="checkbox" id="stackable-${warehouseIndex}-${rowIndex}" checked>
+                <label for="stackable-${warehouseIndex}-${rowIndex}">Sovrapponibile</label>
             </div>
         </div>
     `;
     
     form.appendChild(row);
-    pallets.push({ id: rowIndex });
 }
 
 // Remove a pallet row
-function removePalletRow(index) {
-    const row = document.getElementById(`pallet-${index}`);
+function removePalletRow(warehouseIndex, rowIndex) {
+    const row = document.getElementById(`pallet-${warehouseIndex}-${rowIndex}`);
     if (row) {
         row.remove();
-        pallets = pallets.filter(p => p.id !== index);
         // Re-index remaining rows
-        document.querySelectorAll('.pallet-row').forEach((row, i) => {
+        const form = document.getElementById(`palletForm-${warehouseIndex}`);
+        form.querySelectorAll('.pallet-row').forEach((row, i) => {
             row.querySelector('span').textContent = `Pallet #${i + 1}`;
-            row.querySelector('.remove-btn').onclick = () => removePalletRow(i);
+            row.querySelector('.remove-btn').onclick = () => removePalletRow(warehouseIndex, i);
+            row.id = `pallet-${warehouseIndex}-${i}`;
         });
     }
 }
 
-// Collect pallet data from form
-function collectPalletData() {
+// Collect all pallet data from all warehouses
+function collectAllPalletData() {
     const data = [];
-    const rows = document.querySelectorAll('.pallet-row');
     
-    rows.forEach((row, index) => {
-        const quantity = parseInt(document.getElementById(`quantity-${index}`).value) || 1;
-        const length = parseFloat(document.getElementById(`length-${index}`).value) || 0;
-        const width = parseFloat(document.getElementById(`width-${index}`).value) || 0;
-        const height = parseFloat(document.getElementById(`height-${index}`).value) || 0;
-        const weight = parseFloat(document.getElementById(`weight-${index}`).value) || 0;
-        const stackable = document.getElementById(`stackable-${index}`).checked;
+    warehouses.forEach(warehouse => {
+        const form = document.getElementById(`palletForm-${warehouse.id}`);
+        const rows = form.querySelectorAll('.pallet-row');
         
-        if (length > 0 && width > 0 && height > 0 && weight > 0 && quantity > 0) {
-            // Add multiple copies of the same pallet
-            for (let i = 0; i < quantity; i++) {
-                data.push({
-                    id: `${index}-${i}`,
-                    originalRow: index,
-                    length,
-                    width,
-                    height,
-                    weight,
-                    stackable
-                });
+        rows.forEach((row, rowIndex) => {
+            const quantity = parseInt(document.getElementById(`quantity-${warehouse.id}-${rowIndex}`).value) || 1;
+            const length = parseFloat(document.getElementById(`length-${warehouse.id}-${rowIndex}`).value) || 0;
+            const width = parseFloat(document.getElementById(`width-${warehouse.id}-${rowIndex}`).value) || 0;
+            const height = parseFloat(document.getElementById(`height-${warehouse.id}-${rowIndex}`).value) || 0;
+            const weight = parseFloat(document.getElementById(`weight-${warehouse.id}-${rowIndex}`).value) || 0;
+            const stackable = document.getElementById(`stackable-${warehouse.id}-${rowIndex}`).checked;
+            
+            if (length > 0 && width > 0 && height > 0 && weight > 0 && quantity > 0) {
+                for (let i = 0; i < quantity; i++) {
+                    data.push({
+                        id: `${warehouse.id}-${rowIndex}-${i}`,
+                        warehouseId: warehouse.id,
+                        warehouseName: warehouse.name,
+                        length,
+                        width,
+                        height,
+                        weight,
+                        stackable
+                    });
+                }
             }
-        }
+        });
     });
     
     return data;
+}
+
+// Get color based on pallet dimensions
+function getColorForPallet(length, width, height) {
+    // Create a hash of the dimensions
+    const dimensions = `${length.toFixed(2)}x${width.toFixed(2)}x${height.toFixed(2)}`;
+    let hash = 0;
+    for (let i = 0; i < dimensions.length; i++) {
+        hash = dimensions.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Use the hash to select a color from the palette
+    const colorIndex = Math.abs(hash) % COLOR_PALETTE.length;
+    return COLOR_PALETTE[colorIndex];
 }
 
 // 3D Bin Packing Algorithm
@@ -261,7 +337,7 @@ function initThreeJS() {
     
     // Camera
     camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
-    camera.position.set(15, 10, 15);
+    camera.position.set(20, 15, 20);
     
     // Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -279,12 +355,9 @@ function initThreeJS() {
     scene.add(ambientLight);
     
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(10, 20, 10);
+    directionalLight.position.set(20, 30, 20);
     directionalLight.castShadow = true;
     scene.add(directionalLight);
-    
-    // Draw truck bed
-    drawTruckBed();
     
     // Animation loop
     function animate() {
@@ -304,15 +377,35 @@ function initThreeJS() {
     });
 }
 
-// Draw truck bed
-function drawTruckBed() {
+// Clear all objects from scene
+function clearScene() {
+    const objectsToRemove = [];
+    scene.traverse((child) => {
+        if (child.isMesh || child.isLineSegments) {
+            objectsToRemove.push(child);
+        }
+    });
+    objectsToRemove.forEach(obj => {
+        scene.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+    });
+    
+    truckMeshes = [];
+    palletMeshes = [];
+}
+
+// Draw a truck bed at a specific position
+function drawTruckBed(positionX, offsetY, label) {
+    const group = new THREE.Group();
+    
     // Truck bed (wireframe)
     const geometry = new THREE.BoxGeometry(TRUCK_LENGTH, TRUCK_HEIGHT, TRUCK_WIDTH);
     const edges = new THREE.EdgesGeometry(geometry);
     const material = new THREE.LineBasicMaterial({ color: 0x3b82f6, linewidth: 2 });
-    truckMesh = new THREE.LineSegments(edges, material);
+    const truckMesh = new THREE.LineSegments(edges, material);
     truckMesh.position.set(TRUCK_LENGTH / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
-    scene.add(truckMesh);
+    group.add(truckMesh);
     
     // Floor
     const floorGeometry = new THREE.PlaneGeometry(TRUCK_LENGTH, TRUCK_WIDTH);
@@ -325,36 +418,46 @@ function drawTruckBed() {
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(TRUCK_LENGTH / 2, 0, TRUCK_WIDTH / 2);
-    scene.add(floor);
+    group.add(floor);
     
     // Grid helper
     const gridHelper = new THREE.GridHelper(TRUCK_LENGTH, 20, 0x4b5563, 0x4b5563);
     gridHelper.position.set(TRUCK_LENGTH / 2, 0, TRUCK_WIDTH / 2);
-    scene.add(gridHelper);
+    group.add(gridHelper);
+    
+    // Add label
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+    context.fillStyle = 'white';
+    context.font = 'bold 32px Arial';
+    context.textAlign = 'center';
+    context.fillText(label, 128, 40);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.position.set(TRUCK_LENGTH / 2, TRUCK_HEIGHT + 1, TRUCK_WIDTH / 2);
+    sprite.scale.set(4, 1, 1);
+    group.add(sprite);
+    
+    group.position.set(positionX, offsetY, 0);
+    scene.add(group);
+    truckMeshes.push(group);
+    
+    return group;
 }
 
-// Clear pallets from scene
-function clearPallets() {
-    const objectsToRemove = [];
-    scene.traverse((child) => {
-        if (child.isMesh && child !== truckMesh) {
-            objectsToRemove.push(child);
-        }
-    });
-    objectsToRemove.forEach(obj => scene.remove(obj));
-}
-
-// Draw a pallet
-function drawPallet(pallet, index) {
+// Draw a pallet with dimensions label
+function drawPallet(pallet, index, offset) {
     const geometry = new THREE.BoxGeometry(
         pallet.rotated ? pallet.width : pallet.length,
         pallet.height,
         pallet.rotated ? pallet.length : pallet.width
     );
     
-    // Generate a color based on index
-    const hue = (index * 0.1) % 1;
-    const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
+    const color = getColorForPallet(pallet.length, pallet.width, pallet.height);
     
     const material = new THREE.MeshPhongMaterial({ 
         color: color,
@@ -364,14 +467,14 @@ function drawPallet(pallet, index) {
     
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(
-        pallet.x + (pallet.rotated ? pallet.width : pallet.length) / 2,
-        pallet.z + pallet.height / 2,
+        offset.x + pallet.x + (pallet.rotated ? pallet.width : pallet.length) / 2,
+        offset.y + pallet.z + pallet.height / 2,
         pallet.y + (pallet.rotated ? pallet.length : pallet.width) / 2
     );
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    
     scene.add(mesh);
+    palletMeshes.push(mesh);
     
     // Add edges
     const edges = new THREE.EdgesGeometry(geometry);
@@ -379,33 +482,90 @@ function drawPallet(pallet, index) {
     const edgeMesh = new THREE.LineSegments(edges, edgeMaterial);
     edgeMesh.position.copy(mesh.position);
     scene.add(edgeMesh);
+    palletMeshes.push(edgeMesh);
+    
+    // Add dimensions label
+    const dimensions = `${(pallet.rotated ? pallet.width : pallet.length).toFixed(1)}×${(pallet.rotated ? pallet.length : pallet.width).toFixed(1)}×${pallet.height.toFixed(1)}`;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 128;
+    canvas.height = 64;
+    context.fillStyle = 'rgba(0,0,0,0.7)';
+    context.fillRect(0, 0, 128, 64);
+    context.fillStyle = 'white';
+    context.font = 'bold 14px Arial';
+    context.textAlign = 'center';
+    context.fillText(dimensions, 64, 36);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.position.set(
+        mesh.position.x,
+        mesh.position.y + pallet.height / 2 + 0.3,
+        mesh.position.z
+    );
+    sprite.scale.set(2, 1, 1);
+    scene.add(sprite);
+    palletMeshes.push(sprite);
 }
 
 // Main optimization and visualization function
 function optimizeAndVisualize() {
-    const palletData = collectPalletData();
+    const palletData = collectAllPalletData();
     
     if (palletData.length === 0) {
         alert('Inserisci almeno un pallet valido');
         return;
     }
     
-    // Run packing algorithm
-    const { placedPallets, unplacedPallets } = packPallets(palletData);
-    
     // Clear previous visualization
-    clearPallets();
+    clearScene();
     
-    // Draw placed pallets
-    placedPallets.forEach((pallet, index) => {
-        drawPallet(pallet, index);
+    // Group pallets by warehouse
+    const palletsByWarehouse = {};
+    palletData.forEach(p => {
+        if (!palletsByWarehouse[p.warehouseId]) {
+            palletsByWarehouse[p.warehouseId] = [];
+        }
+        palletsByWarehouse[p.warehouseId].push(p);
     });
     
-    // Calculate totals
-    const totalWeight = placedPallets.reduce((sum, p) => sum + p.weight, 0);
-    const maxPlacedHeight = placedPallets.reduce((max, p) => Math.max(max, p.z + p.height), 0);
+    // Draw each warehouse on a separate truck
+    let offsetX = 0;
+    const spacing = TRUCK_LENGTH + 5;
+    
+    Object.keys(palletsByWarehouse).forEach((warehouseId, index) => {
+        const warehousePallets = palletsByWarehouse[warehouseId];
+        const warehouseName = warehouses.find(w => w.id === parseInt(warehouseId))?.name || `M${warehouseId}`;
+        
+        // Draw truck bed
+        const truckOffset = { x: offsetX, y: 0 };
+        drawTruckBed(offsetX, 0, `🏭 ${warehouseName}`);
+        
+        // Run packing algorithm for this warehouse
+        const { placedPallets, unplacedPallets } = packPallets(warehousePallets);
+        
+        // Draw placed pallets
+        placedPallets.forEach((pallet, i) => {
+            drawPallet(pallet, i, truckOffset);
+        });
+        
+        offsetX += spacing;
+    });
+    
+    // Adjust camera to see all trucks
+    const totalWidth = Object.keys(palletsByWarehouse).length * spacing;
+    camera.position.set(totalWidth / 2 + 10, 15, 20);
+    controls.target.set(totalWidth / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
+    controls.update();
     
     // Display results
+    displayResults(palletData);
+}
+
+// Display results
+function displayResults(palletData) {
     const resultsDiv = document.getElementById('results');
     const resultsContent = document.getElementById('resultsContent');
     const errorsDiv = document.getElementById('errors');
@@ -414,50 +574,30 @@ function optimizeAndVisualize() {
     resultsDiv.classList.remove('hidden');
     errorsDiv.classList.add('hidden');
     
-    let resultsHTML = `
-        <p><strong>Pallet posizionati:</strong> ${placedPallets.length} / ${palletData.length}</p>
-        <p><strong>Peso totale:</strong> ${(totalWeight / 1000).toFixed(2)}t / 25t</p>
-        <p><strong>Altezza massima:</strong> ${maxPlacedHeight.toFixed(2)}m / 2.60m</p>
-        <p><strong>Volume occupato:</strong> ${placedPallets.reduce((sum, p) => sum + p.length * p.width * p.height, 0).toFixed(2)}m³</p>
-    `;
+    // Group by warehouse
+    const byWarehouse = {};
+    palletData.forEach(p => {
+        if (!byWarehouse[p.warehouseName]) {
+            byWarehouse[p.warehouseName] = [];
+        }
+        byWarehouse[p.warehouseName].push(p);
+    });
+    
+    let resultsHTML = '';
+    Object.keys(byWarehouse).forEach(warehouseName => {
+        const pallets = byWarehouse[warehouseName];
+        const totalWeight = pallets.reduce((sum, p) => sum + p.weight, 0);
+        const totalVolume = pallets.reduce((sum, p) => sum + p.length * p.width * p.height, 0);
+        
+        resultsHTML += `
+            <p><strong>${warehouseName}:</strong> ${pallets.length} pallet, ${(totalWeight / 1000).toFixed(2)}t, ${totalVolume.toFixed(2)}m³</p>
+        `;
+    });
     
     resultsContent.innerHTML = resultsHTML;
-    
-    // Check for issues
-    const issues = [];
-    
-    if (totalWeight > MAX_WEIGHT) {
-        issues.push(`⚠️ Peso eccessivo: ${(totalWeight / 1000).toFixed(2)}t (max 25t)`);
-    }
-    
-    if (maxPlacedHeight > TRUCK_HEIGHT) {
-        issues.push(`⚠️ Altezza eccessiva: ${maxPlacedHeight.toFixed(2)}m (max 2.60m)`);
-    }
-    
-    if (unplacedPallets.length > 0) {
-        // Group unplaced pallets by original row
-        const unplacedGroups = {};
-        unplacedPallets.forEach(p => {
-            const key = `${p.length}x${p.width}x${p.height}`;
-            if (!unplacedGroups[key]) {
-                unplacedGroups[key] = { count: 0, ...p };
-            }
-            unplacedGroups[key].count++;
-        });
-        
-        issues.push(`⚠️ ${unplacedPallets.length} pallet non ci stanno:`);
-        Object.values(unplacedGroups).forEach(group => {
-            issues.push(`   - ${group.count} pallet: ${group.length}m × ${group.width}m × ${group.height}m (${group.weight}kg)`);
-        });
-    }
-    
-    if (issues.length > 0) {
-        errorsDiv.classList.remove('hidden');
-        errorsContent.innerHTML = issues.join('<br>');
-    }
-    
-    // Reset camera to good viewing position
-    camera.position.set(15, 10, 15);
-    controls.target.set(TRUCK_LENGTH / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
-    controls.update();
+}
+
+// Generate combinations (placeholder for now)
+function generateCombinations() {
+    alert('Funzione di generazione combinazioni in sviluppo...');
 }

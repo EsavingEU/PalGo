@@ -18,22 +18,22 @@
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- Form Pallet -->
+            <!-- Form Magazzini -->
             <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
                 <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
                     <span class="bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">1</span>
-                    Inserisci Pallet
+                    Magazzini / Ritiri
                 </h2>
 
-                <div id="palletForm" class="space-y-4">
-                    <!-- Pallet rows will be added here -->
+                <div id="warehousesForm" class="space-y-4">
+                    <!-- Warehouse sections will be added here -->
                 </div>
 
-                <button onclick="addPalletRow()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
+                <button onclick="addWarehouse()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
-                    Aggiungi Pallet
+                    Aggiungi Magazzino
                 </button>
 
                 <div class="mt-6 p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
@@ -45,9 +45,14 @@
                     </ul>
                 </div>
 
-                <button onclick="optimizeAndVisualize()" class="mt-6 w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 text-lg">
-                    🚀 Ottimizza e Visualizza
-                </button>
+                <div class="mt-4 space-y-2">
+                    <button onclick="optimizeAndVisualize()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 text-lg">
+                        🚀 Ottimizza e Visualizza
+                    </button>
+                    <button onclick="generateCombinations()" class="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                        🔗 Genera Combinazioni
+                    </button>
+                </div>
             </div>
 
             <!-- 3D Visualization -->
