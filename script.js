@@ -190,7 +190,7 @@ function getColorForPallet(length, width, height) {
 }
 
 // 3D Bin Packing Algorithm
-function packPallets(palletData) {
+function packPallets(palletData, respectWarehouseOrder = false) {
     // Sort pallets by base area (larger first) for better packing
     const sortedPallets = [...palletData].sort((a, b) => {
         const areaA = a.length * a.width;
@@ -198,11 +198,24 @@ function packPallets(palletData) {
         return areaB - areaA;
     });
     
+    // If respecting warehouse order, sort by warehouse first
+    if (respectWarehouseOrder) {
+        sortedPallets.sort((a, b) => {
+            if (a.warehouseId !== b.warehouseId) {
+                return a.warehouseId - b.warehouseId;
+            }
+            // Within same warehouse, sort by area
+            const areaA = a.length * a.width;
+            const areaB = b.length * b.width;
+            return areaB - areaA;
+        });
+    }
+    
     const placedPallets = [];
     const unplacedPallets = [];
     
     // Create a 3D grid representation of the truck
-    const cellSize = 0.05; // 5cm resolution
+    const cellSize = 0.1; // 10cm resolution (faster, less precise)
     const gridLength = Math.ceil(TRUCK_LENGTH / cellSize);
     const gridWidth = Math.ceil(TRUCK_WIDTH / cellSize);
     const gridHeight = Math.ceil(TRUCK_HEIGHT / cellSize);
@@ -213,6 +226,9 @@ function packPallets(palletData) {
             Array(gridLength).fill(false)
         )
     );
+    
+    // Track which warehouse occupies which section of the truck
+    const warehouseSections = {};
     
     // Function to check if a position is valid
     function canPlace(pallet, x, y, z, rotated) {
@@ -243,6 +259,19 @@ function packPallets(palletData) {
             }
         }
         
+        // If respecting warehouse order, check if this section is already occupied by a different warehouse
+        if (respectWarehouseOrder) {
+            const midX = x + pLength / 2;
+            for (const whId in warehouseSections) {
+                if (whId !== String(pallet.warehouseId)) {
+                    const section = warehouseSections[whId];
+                    if (midX >= section.start && midX <= section.end) {
+                        return false; // Would overlap with different warehouse
+                    }
+                }
+            }
+        }
+        
         return true;
     }
     
@@ -266,6 +295,16 @@ function packPallets(palletData) {
                 }
             }
         }
+        
+        // Track warehouse section
+        if (respectWarehouseOrder) {
+            const whId = String(pallet.warehouseId);
+            if (!warehouseSections[whId]) {
+                warehouseSections[whId] = { start: x, end: x + pLength };
+            } else {
+                warehouseSections[whId].end = Math.max(warehouseSections[whId].end, x + pLength);
+            }
+        }
     }
     
     // Try to place each pallet with orientation optimization
@@ -275,12 +314,21 @@ function packPallets(palletData) {
         let bestOrientation = false;
         let bestLinearPosition = Infinity;
         
+        // For warehouse order, constrain placement to warehouse section
+        let minX = 0;
+        let maxX = TRUCK_LENGTH;
+        
+        if (respectWarehouseOrder && warehouseSections[String(pallet.warehouseId)]) {
+            minX = warehouseSections[String(pallet.warehouseId)].start;
+            maxX = warehouseSections[String(pallet.warehouseId)].end;
+        }
+        
         // Try both orientations and find the one that minimizes linear space
         for (const rotated of [false, true]) {
             const pLength = rotated ? pallet.width : pallet.length;
             
             // Try to place at the bottom (z=0)
-            for (let x = 0; x <= TRUCK_LENGTH - pLength; x += cellSize) {
+            for (let x = minX; x <= maxX - pLength; x += cellSize) {
                 for (let y = 0; y <= TRUCK_WIDTH - (rotated ? pallet.length : pallet.width); y += cellSize) {
                     if (canPlace(pallet, x, y, 0, rotated)) {
                         const linearPosition = x + pLength;
@@ -294,9 +342,12 @@ function packPallets(palletData) {
                 }
             }
             
-            // If stackable, try to place on top of other pallets
+            // If stackable, try to place on top of other pallets from SAME warehouse
             if (pallet.stackable) {
                 for (const placedPallet of placedPallets) {
+                    // Only stack on pallets from same warehouse
+                    if (String(placedPallet.warehouseId) !== String(pallet.warehouseId)) continue;
+                    
                     const topZ = placedPallet.z + placedPallet.height;
                     
                     for (let x = placedPallet.x; x <= placedPallet.x + (placedPallet.rotated ? placedPallet.width : placedPallet.length) - pLength; x += cellSize) {
@@ -810,6 +861,11 @@ async function generateCombinations() {
         return;
     }
     
+    // Clear scene immediately to free memory
+    clearScene();
+    window.combinations = null;
+    previousMultiView = null;
+    
     // Show loading indicator
     const resultsDiv = document.getElementById('results');
     const resultsContent = document.getElementById('resultsContent');
@@ -835,7 +891,12 @@ async function generateCombinations() {
             for (let size = warehouseIds.length; size >= 2; size--) {
                 const combinationsOfSize = getCombinations(warehouseIds, size);
                 
-                for (const combination of combinationsOfSize) {
+                // Limit the number of combinations to try per size (performance)
+                const maxCombinationsToTry = Math.min(combinationsOfSize.length, 10);
+                
+                for (let i = 0; i < maxCombinationsToTry; i++) {
+                    const combination = combinationsOfSize[i];
+                    
                     // Combine all pallets from these warehouses in order
                     const combinedPallets = [];
                     combination.forEach(whId => {
@@ -844,8 +905,8 @@ async function generateCombinations() {
                         });
                     });
                     
-                    // Try to pack all pallets in one truck
-                    const { placedPallets, unplacedPallets } = packPallets(combinedPallets);
+                    // Try to pack all pallets in one truck (respect warehouse order)
+                    const { placedPallets, unplacedPallets } = packPallets(combinedPallets, true);
                     
                     if (unplacedPallets.length === 0) {
                         // All pallets fit - calculate stats
