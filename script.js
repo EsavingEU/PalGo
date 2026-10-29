@@ -313,6 +313,7 @@ function packPallets(palletData, respectWarehouseOrder = false) {
         let bestPosition = null;
         let bestOrientation = false;
         let bestLinearPosition = Infinity;
+        let bestStackLevel = 0; // Prefer stacking to save space
         
         // For warehouse order, constrain placement to warehouse section
         let minX = 0;
@@ -327,22 +328,7 @@ function packPallets(palletData, respectWarehouseOrder = false) {
         for (const rotated of [false, true]) {
             const pLength = rotated ? pallet.width : pallet.length;
             
-            // Try to place at the bottom (z=0)
-            for (let x = minX; x <= maxX - pLength; x += cellSize) {
-                for (let y = 0; y <= TRUCK_WIDTH - (rotated ? pallet.length : pallet.width); y += cellSize) {
-                    if (canPlace(pallet, x, y, 0, rotated)) {
-                        const linearPosition = x + pLength;
-                        if (linearPosition < bestLinearPosition) {
-                            bestLinearPosition = linearPosition;
-                            bestPosition = { x, y, z: 0 };
-                            bestOrientation = rotated;
-                            placed = true;
-                        }
-                    }
-                }
-            }
-            
-            // If stackable, try to place on top of other pallets from SAME warehouse
+            // PRIORITY 1: If stackable, try to place on top of other pallets from SAME warehouse
             if (pallet.stackable) {
                 for (const placedPallet of placedPallets) {
                     // Only stack on pallets from same warehouse
@@ -353,17 +339,47 @@ function packPallets(palletData, respectWarehouseOrder = false) {
                     // Check if stacking would exceed height limit
                     if (topZ + pallet.height > TRUCK_HEIGHT) continue;
                     
-                    for (let x = placedPallet.x; x <= placedPallet.x + (placedPallet.rotated ? placedPallet.width : placedPallet.length) - pLength; x += cellSize) {
-                        for (let y = placedPallet.y; y <= placedPallet.y + (placedPallet.rotated ? placedPallet.length : placedPallet.width) - (rotated ? pallet.length : pallet.width); y += cellSize) {
+                    // Check if pallet dimensions are IDENTICAL for stacking
+                    const placedLength = placedPallet.rotated ? placedPallet.width : placedPallet.length;
+                    const placedWidth = placedPallet.rotated ? placedPallet.length : placedPallet.width;
+                    
+                    const palletLengthForCheck = rotated ? pallet.width : pallet.length;
+                    const palletWidthForCheck = rotated ? pallet.length : pallet.width;
+                    
+                    // Top pallet must have IDENTICAL dimensions to bottom pallet
+                    if (Math.abs(palletLengthForCheck - placedLength) > 0.01 || Math.abs(palletWidthForCheck - placedWidth) > 0.01) continue;
+                    
+                    for (let x = placedPallet.x; x <= placedPallet.x + placedLength - pLength; x += cellSize) {
+                        for (let y = placedPallet.y; y <= placedPallet.y + placedWidth - (rotated ? pallet.length : pallet.width); y += cellSize) {
                             if (canPlace(pallet, x, y, topZ, rotated)) {
                                 const linearPosition = x + pLength;
-                                // Prefer stacking even if linear position is slightly worse (1.5x tolerance)
-                                if (linearPosition < bestLinearPosition * 1.5) {
+                                const stackLevel = Math.floor(topZ / pallet.height);
+                                // PRIORITY: Stacking always beats floor placement
+                                if (stackLevel > bestStackLevel || (stackLevel === bestStackLevel && linearPosition < bestLinearPosition)) {
                                     bestLinearPosition = linearPosition;
                                     bestPosition = { x, y, z: topZ };
                                     bestOrientation = rotated;
+                                    bestStackLevel = stackLevel;
                                     placed = true;
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // PRIORITY 2: Try to place at the bottom (z=0) - only if no stacking found
+            if (bestStackLevel === 0) {
+                for (let x = minX; x <= maxX - pLength; x += cellSize) {
+                    for (let y = 0; y <= TRUCK_WIDTH - (rotated ? pallet.length : pallet.width); y += cellSize) {
+                        if (canPlace(pallet, x, y, 0, rotated)) {
+                            const linearPosition = x + pLength;
+                            if (linearPosition < bestLinearPosition) {
+                                bestLinearPosition = linearPosition;
+                                bestPosition = { x, y, z: 0 };
+                                bestOrientation = rotated;
+                                bestStackLevel = 0;
+                                placed = true;
                             }
                         }
                     }
