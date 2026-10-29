@@ -350,11 +350,15 @@ function packPallets(palletData, respectWarehouseOrder = false) {
                     
                     const topZ = placedPallet.z + placedPallet.height;
                     
+                    // Check if stacking would exceed height limit
+                    if (topZ + pallet.height > TRUCK_HEIGHT) continue;
+                    
                     for (let x = placedPallet.x; x <= placedPallet.x + (placedPallet.rotated ? placedPallet.width : placedPallet.length) - pLength; x += cellSize) {
                         for (let y = placedPallet.y; y <= placedPallet.y + (placedPallet.rotated ? placedPallet.length : placedPallet.width) - (rotated ? pallet.length : pallet.width); y += cellSize) {
                             if (canPlace(pallet, x, y, topZ, rotated)) {
                                 const linearPosition = x + pLength;
-                                if (linearPosition < bestLinearPosition) {
+                                // Prefer stacking even if linear position is slightly worse (1.5x tolerance)
+                                if (linearPosition < bestLinearPosition * 1.5) {
                                     bestLinearPosition = linearPosition;
                                     bestPosition = { x, y, z: topZ };
                                     bestOrientation = rotated;
