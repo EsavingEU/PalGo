@@ -956,99 +956,87 @@ async function generateCombinations() {
                 });
             }
             
-            // Strategy 2: Try pairing warehouses (2 warehouses per truck)
+            // Strategy 2: Try to group warehouses into trucks (bin packing)
+            // This is a simplified greedy approach
             if (warehouseIds.length >= 2) {
-                for (let i = 0; i < warehouseIds.length; i++) {
-                    for (let j = i + 1; j < warehouseIds.length; j++) {
-                        const wh1 = warehouseIds[i];
-                        const wh2 = warehouseIds[j];
+                // Try different grouping strategies
+                const maxTrucksToTry = Math.min(warehouseIds.length, 3);
+                
+                for (let numTrucks = 2; numTrucks <= maxTrucksToTry; numTrucks++) {
+                    // Use a greedy approach to assign warehouses to trucks
+                    const truckAssignments = Array.from({ length: numTrucks }, () => []);
+                    const remainingIds = [...warehouseIds];
+                    
+                    // Sort warehouses by number of pallets (largest first)
+                    remainingIds.sort((a, b) => palletsByWarehouse[b].length - palletsByWarehouse[a].length);
+                    
+                    // Assign each warehouse to the truck with most available space
+                    for (const whId of remainingIds) {
+                        let bestTruck = 0;
+                        let bestScore = Infinity;
                         
-                        // Try to fit both in one truck
-                        const combinedPallets = [...palletsByWarehouse[wh1], ...palletsByWarehouse[wh2]];
-                        const { placedPallets, unplacedPallets } = packPallets(combinedPallets, true);
-                        
-                        if (unplacedPallets.length === 0) {
-                            // Both fit in one truck
-                            const remainingIds = warehouseIds.filter(id => id !== wh1 && id !== wh2);
+                        for (let t = 0; t < numTrucks; t++) {
+                            const currentPallets = truckAssignments[t].reduce((sum, id) => sum + palletsByWarehouse[id].length, 0);
+                            const newPallets = currentPallets + palletsByWarehouse[whId].length;
                             
-                            // If no remaining warehouses, this is the best option
-                            if (remainingIds.length === 0) {
-                                const wh1Name = warehouses.find(w => w.id === parseInt(wh1))?.name || `M${wh1}`;
-                                const wh2Name = warehouses.find(w => w.id === parseInt(wh2))?.name || `M${wh2}`;
-                                
-                                const uniqueRows = new Set();
-                                const totalWeight = combinedPallets.reduce((sum, p) => {
-                                    const rowKey = `${p.warehouseId}-${p.id.split('-')[1]}`;
-                                    if (!uniqueRows.has(rowKey)) {
-                                        uniqueRows.add(rowKey);
-                                        return sum + (p.totalWeight || p.weight);
-                                    }
-                                    return sum;
-                                }, 0);
-                                
-                                const maxLinearMeter = placedPallets.reduce((max, p) => {
-                                    const endPosition = p.x + (p.rotated ? p.width : p.length);
-                                    return Math.max(max, endPosition);
-                                }, 0);
-                                
-                                combinations.push({
-                                    type: 'single',
-                                    warehouses: `${wh1Name} + ${wh2Name}`,
-                                    numPallets: combinedPallets.length,
-                                    totalWeight: totalWeight,
-                                    linearMeters: maxLinearMeter,
-                                    savedTrucks: 1,
-                                    warehouseIds: [wh1, wh2]
-                                });
-                            } else {
-                                // Try to fit remaining in another truck
-                                const remainingPallets = [];
-                                remainingIds.forEach(whId => {
-                                    palletsByWarehouse[whId].forEach(p => {
-                                        remainingPallets.push(p);
-                                    });
-                                });
-                                
-                                const { placedPallets: remainingPlaced, unplacedPallets: remainingUnplaced } = packPallets(remainingPallets, true);
-                                
-                                if (remainingUnplaced.length === 0) {
-                                    // Both trucks work
-                                    const wh1Name = warehouses.find(w => w.id === parseInt(wh1))?.name || `M${wh1}`;
-                                    const wh2Name = warehouses.find(w => w.id === parseInt(wh2))?.name || `M${wh2}`;
-                                    const remainingNames = remainingIds.map(id =>
-                                        warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
-                                    ).join(' + ');
-                                    
-                                    const maxLinearMeter1 = placedPallets.reduce((max, p) => {
-                                        const endPosition = p.x + (p.rotated ? p.width : p.length);
-                                        return Math.max(max, endPosition);
-                                    }, 0);
-                                    
-                                    const maxLinearMeter2 = remainingPlaced.reduce((max, p) => {
-                                        const endPosition = p.x + (p.rotated ? p.width : p.length);
-                                        return Math.max(max, endPosition);
-                                    }, 0);
-                                    
-                                    combinations.push({
-                                        type: 'multi',
-                                        trucks: [
-                                            {
-                                                warehouses: `${wh1Name} + ${wh2Name}`,
-                                                pallets: combinedPallets.length,
-                                                linearMeters: maxLinearMeter1
-                                            },
-                                            {
-                                                warehouses: remainingNames,
-                                                pallets: remainingPallets.length,
-                                                linearMeters: maxLinearMeter2
-                                            }
-                                        ],
-                                        numTrucks: 2,
-                                        totalPallets: combinedPallets.length + remainingPallets.length
-                                    });
+                            // Try to fit in truck
+                            const combinedPallets = [...truckAssignments[t].map(id => palletsByWarehouse[id]).flat(), ...palletsByWarehouse[whId]];
+                            const { unplacedPallets } = packPallets(combinedPallets, true);
+                            
+                            if (unplacedPallets.length === 0) {
+                                // Fits - prefer trucks with less pallets (balance)
+                                if (newPallets < bestScore) {
+                                    bestScore = newPallets;
+                                    bestTruck = t;
                                 }
                             }
                         }
+                        
+                        truckAssignments[bestTruck].push(whId);
+                    }
+                    
+                    // Check if all assignments are valid
+                    let allValid = true;
+                    const trucks = [];
+                    
+                    for (let t = 0; t < numTrucks; t++) {
+                        if (truckAssignments[t].length === 0) {
+                            allValid = false;
+                            break;
+                        }
+                        
+                        const combinedPallets = truckAssignments[t].map(id => palletsByWarehouse[id]).flat();
+                        const { placedPallets, unplacedPallets } = packPallets(combinedPallets, true);
+                        
+                        if (unplacedPallets.length > 0) {
+                            allValid = false;
+                            break;
+                        }
+                        
+                        const maxLinearMeter = placedPallets.reduce((max, p) => {
+                            const endPosition = p.x + (p.rotated ? p.width : p.length);
+                            return Math.max(max, endPosition);
+                        }, 0);
+                        
+                        const whNames = truckAssignments[t].map(id =>
+                            warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
+                        ).join(' + ');
+                        
+                        trucks.push({
+                            warehouses: whNames,
+                            pallets: combinedPallets.length,
+                            linearMeters: maxLinearMeter
+                        });
+                    }
+                    
+                    if (allValid) {
+                        const totalPallets = trucks.reduce((sum, t) => sum + t.pallets, 0);
+                        combinations.push({
+                            type: 'multi',
+                            trucks: trucks,
+                            numTrucks: numTrucks,
+                            totalPallets: totalPallets
+                        });
                     }
                 }
             }
