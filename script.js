@@ -31,6 +31,7 @@ const COLOR_PALETTE = [
 document.addEventListener('DOMContentLoaded', function() {
     addWarehouse();
     initThreeJS();
+    loadSavedConfigs();
 });
 
 // Add a new warehouse section
@@ -43,7 +44,7 @@ function addWarehouse() {
     warehouse.id = `warehouse-${warehouseIndex}`;
     warehouse.innerHTML = `
         <div class="flex justify-between items-center mb-3">
-            <span class="text-white font-semibold text-lg">🏭 Magazzino ${String.fromCharCode(65 + warehouseIndex)}</span>
+            <input type="text" class="warehouse-name bg-white/10 border border-white/30 rounded px-2 py-1 text-white font-semibold text-lg w-40" value="Magazzino ${String.fromCharCode(65 + warehouseIndex)}" onchange="updateWarehouseName(${warehouseIndex}, this.value)">
             <button onclick="removeWarehouse(${warehouseIndex})" class="remove-btn">Rimuovi</button>
         </div>
         <div id="palletForm-${warehouseIndex}" class="space-y-3">
@@ -55,10 +56,18 @@ function addWarehouse() {
     `;
     
     form.appendChild(warehouse);
-    warehouses.push({ id: warehouseIndex, name: String.fromCharCode(65 + warehouseIndex) });
+    warehouses.push({ id: warehouseIndex, name: `Magazzino ${String.fromCharCode(65 + warehouseIndex)}` });
     
     // Add one pallet row by default
     addPalletRow(warehouseIndex);
+}
+
+// Update warehouse name
+function updateWarehouseName(index, newName) {
+    const warehouse = warehouses.find(w => w.id === index);
+    if (warehouse) {
+        warehouse.name = newName;
+    }
 }
 
 // Remove a warehouse
@@ -69,7 +78,11 @@ function removeWarehouse(index) {
         warehouses = warehouses.filter(w => w.id !== index);
         // Re-index remaining warehouses
         document.querySelectorAll('.warehouse-section').forEach((wh, i) => {
-            wh.querySelector('span').textContent = `🏭 Magazzino ${String.fromCharCode(65 + i)}`;
+            const nameInput = wh.querySelector('.warehouse-name');
+            if (nameInput) {
+                nameInput.value = warehouses[i]?.name || `Magazzino ${String.fromCharCode(65 + i)}`;
+                nameInput.onchange = (e) => updateWarehouseName(i, e.target.value);
+            }
             wh.querySelector('.remove-btn').onclick = () => removeWarehouse(i);
             wh.id = `warehouse-${i}`;
         });
@@ -92,26 +105,26 @@ function addPalletRow(warehouseIndex) {
         <div class="input-group">
             <div>
                 <div class="input-label">Quantità</div>
-                <input type="number" id="quantity-${warehouseIndex}-${rowIndex}" placeholder="1" step="1" min="1" value="1">
+                <input type="number" class="pallet-qty" id="quantity-${warehouseIndex}-${rowIndex}" placeholder="1" step="1" min="1" value="1">
             </div>
             <div>
                 <div class="input-label">Lunghezza (m)</div>
-                <input type="number" id="length-${warehouseIndex}-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
+                <input type="number" class="pallet-length" id="length-${warehouseIndex}-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
             </div>
             <div>
                 <div class="input-label">Larghezza (m)</div>
-                <input type="number" id="width-${warehouseIndex}-${rowIndex}" placeholder="0.8" step="0.01" min="0.1" value="0.8">
+                <input type="number" class="pallet-width" id="width-${warehouseIndex}-${rowIndex}" placeholder="0.8" step="0.01" min="0.1" value="0.8">
             </div>
             <div>
                 <div class="input-label">Altezza (m)</div>
-                <input type="number" id="height-${warehouseIndex}-${rowIndex}" placeholder="1.5" step="0.01" min="0.1" value="1.5">
+                <input type="number" class="pallet-height" id="height-${warehouseIndex}-${rowIndex}" placeholder="1.5" step="0.01" min="0.1" value="1.5">
             </div>
             <div>
                 <div class="input-label">Peso (kg)</div>
-                <input type="number" id="weight-${warehouseIndex}-${rowIndex}" placeholder="500" step="1" min="1" value="500">
+                <input type="number" class="pallet-weight" id="weight-${warehouseIndex}-${rowIndex}" placeholder="500" step="1" min="1" value="500">
             </div>
             <div class="checkbox-group">
-                <input type="checkbox" id="stackable-${warehouseIndex}-${rowIndex}" checked>
+                <input type="checkbox" class="pallet-stackable" id="stackable-${warehouseIndex}-${rowIndex}" checked>
                 <label for="stackable-${warehouseIndex}-${rowIndex}">Sovrapponibile</label>
             </div>
         </div>
@@ -718,15 +731,18 @@ function drawPallet(pallet, index, offset) {
 
 // Main optimization and visualization function
 function optimizeAndVisualize() {
+    // Clear all state to ensure fresh calculation
+    clearScene();
+    window.combinations = null;
+    previousMultiView = null;
+    window.truckPositions = null;
+    
     const palletData = collectAllPalletData();
     
     if (palletData.length === 0) {
         alert('Inserisci almeno un pallet valido');
         return;
     }
-    
-    // Clear combinations view
-    window.combinations = null;
     
     // Show loading indicator
     const resultsDiv = document.getElementById('results');
@@ -737,9 +753,6 @@ function optimizeAndVisualize() {
     // Use setTimeout to allow UI to update
     setTimeout(() => {
         try {
-            // Clear previous visualization
-            clearScene();
-            
             // Group pallets by warehouse
             const palletsByWarehouse = {};
             palletData.forEach(p => {
@@ -907,8 +920,7 @@ async function generateCombinations() {
             const warehouseIds = Object.keys(palletsByWarehouse);
             const combinations = [];
             
-            // Try different distribution strategies
-            // Strategy 1: All in one truck (if possible)
+            // Strategy 1: Try all warehouses in one truck
             const allPallets = palletData;
             const { placedPallets: allPlaced, unplacedPallets: allUnplaced } = packPallets(allPallets, true);
             
@@ -929,7 +941,7 @@ async function generateCombinations() {
                     return Math.max(max, endPosition);
                 }, 0);
                 
-                const warehouseNames = warehouseIds.map(id => 
+                const warehouseNames = warehouseIds.map(id =>
                     warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
                 ).join(' + ');
                 
@@ -942,96 +954,133 @@ async function generateCombinations() {
                     savedTrucks: warehouseIds.length - 1,
                     warehouseIds: warehouseIds
                 });
-            } else {
-                // Strategy 2: Try to pair warehouses in trucks
-                // Start with simple: each warehouse alone in a truck
-                const simpleOption = {
-                    type: 'multi',
-                    trucks: warehouseIds.map(id => {
-                        const whName = warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`;
-                        return {
-                            warehouses: whName,
-                            pallets: palletsByWarehouse[id].length
-                        };
-                    }),
-                    numTrucks: warehouseIds.length,
-                    totalPallets: palletData.length
-                };
-                combinations.push(simpleOption);
-                
-                // Try to pair warehouses to reduce truck count
-                const maxGroupSize = Math.min(warehouseIds.length, 2);
-                
-                for (let groupSize = 2; groupSize <= maxGroupSize; groupSize++) {
-                    const groups = getCombinations(warehouseIds, groupSize);
-                    
-                    for (const group of groups) {
-                        // Try to fit this group in one truck
-                        const groupPallets = [];
-                        group.forEach(whId => {
-                            palletsByWarehouse[whId].forEach(p => {
-                                groupPallets.push(p);
-                            });
-                        });
+            }
+            
+            // Strategy 2: Try pairing warehouses (2 warehouses per truck)
+            if (warehouseIds.length >= 2) {
+                for (let i = 0; i < warehouseIds.length; i++) {
+                    for (let j = i + 1; j < warehouseIds.length; j++) {
+                        const wh1 = warehouseIds[i];
+                        const wh2 = warehouseIds[j];
                         
-                        const { placedPallets, unplacedPallets } = packPallets(groupPallets, true);
+                        // Try to fit both in one truck
+                        const combinedPallets = [...palletsByWarehouse[wh1], ...palletsByWarehouse[wh2]];
+                        const { placedPallets, unplacedPallets } = packPallets(combinedPallets, true);
                         
                         if (unplacedPallets.length === 0) {
-                            // This group fits in one truck
-                            // Now try to fit the remaining warehouses
-                            const remainingIds = warehouseIds.filter(id => !group.includes(id));
+                            // Both fit in one truck
+                            const remainingIds = warehouseIds.filter(id => id !== wh1 && id !== wh2);
                             
+                            // If no remaining warehouses, this is the best option
                             if (remainingIds.length === 0) {
-                                // All warehouses fit - we already found this in Strategy 1
-                                continue;
-                            }
-                            
-                            // Recursively try to fit remaining warehouses
-                            const remainingPallets = [];
-                            remainingIds.forEach(whId => {
-                                palletsByWarehouse[whId].forEach(p => {
-                                    remainingPallets.push(p);
-                                });
-                            });
-                            
-                            const { placedPallets: remainingPlaced, unplacedPallets: remainingUnplaced } = packPallets(remainingPallets, true);
-                            
-                            if (remainingUnplaced.length === 0) {
-                                // Both groups fit
-                                const trucks = [
-                                    {
-                                        warehouses: group.map(id => 
-                                            warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
-                                        ).join(' + '),
-                                        pallets: groupPallets.length
-                                    },
-                                    {
-                                        warehouses: remainingIds.map(id => 
-                                            warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
-                                        ).join(' + '),
-                                        pallets: remainingPallets.length
+                                const wh1Name = warehouses.find(w => w.id === parseInt(wh1))?.name || `M${wh1}`;
+                                const wh2Name = warehouses.find(w => w.id === parseInt(wh2))?.name || `M${wh2}`;
+                                
+                                const uniqueRows = new Set();
+                                const totalWeight = combinedPallets.reduce((sum, p) => {
+                                    const rowKey = `${p.warehouseId}-${p.id.split('-')[1]}`;
+                                    if (!uniqueRows.has(rowKey)) {
+                                        uniqueRows.add(rowKey);
+                                        return sum + (p.totalWeight || p.weight);
                                     }
-                                ];
+                                    return sum;
+                                }, 0);
+                                
+                                const maxLinearMeter = placedPallets.reduce((max, p) => {
+                                    const endPosition = p.x + (p.rotated ? p.width : p.length);
+                                    return Math.max(max, endPosition);
+                                }, 0);
                                 
                                 combinations.push({
-                                    type: 'multi',
-                                    trucks: trucks,
-                                    numTrucks: 2,
-                                    totalPallets: groupPallets.length + remainingPallets.length
+                                    type: 'single',
+                                    warehouses: `${wh1Name} + ${wh2Name}`,
+                                    numPallets: combinedPallets.length,
+                                    totalWeight: totalWeight,
+                                    linearMeters: maxLinearMeter,
+                                    savedTrucks: 1,
+                                    warehouseIds: [wh1, wh2]
                                 });
+                            } else {
+                                // Try to fit remaining in another truck
+                                const remainingPallets = [];
+                                remainingIds.forEach(whId => {
+                                    palletsByWarehouse[whId].forEach(p => {
+                                        remainingPallets.push(p);
+                                    });
+                                });
+                                
+                                const { placedPallets: remainingPlaced, unplacedPallets: remainingUnplaced } = packPallets(remainingPallets, true);
+                                
+                                if (remainingUnplaced.length === 0) {
+                                    // Both trucks work
+                                    const wh1Name = warehouses.find(w => w.id === parseInt(wh1))?.name || `M${wh1}`;
+                                    const wh2Name = warehouses.find(w => w.id === parseInt(wh2))?.name || `M${wh2}`;
+                                    const remainingNames = remainingIds.map(id =>
+                                        warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`
+                                    ).join(' + ');
+                                    
+                                    const maxLinearMeter1 = placedPallets.reduce((max, p) => {
+                                        const endPosition = p.x + (p.rotated ? p.width : p.length);
+                                        return Math.max(max, endPosition);
+                                    }, 0);
+                                    
+                                    const maxLinearMeter2 = remainingPlaced.reduce((max, p) => {
+                                        const endPosition = p.x + (p.rotated ? p.width : p.length);
+                                        return Math.max(max, endPosition);
+                                    }, 0);
+                                    
+                                    combinations.push({
+                                        type: 'multi',
+                                        trucks: [
+                                            {
+                                                warehouses: `${wh1Name} + ${wh2Name}`,
+                                                pallets: combinedPallets.length,
+                                                linearMeters: maxLinearMeter1
+                                            },
+                                            {
+                                                warehouses: remainingNames,
+                                                pallets: remainingPallets.length,
+                                                linearMeters: maxLinearMeter2
+                                            }
+                                        ],
+                                        numTrucks: 2,
+                                        totalPallets: combinedPallets.length + remainingPallets.length
+                                    });
+                                }
                             }
                         }
                     }
                 }
             }
             
-            // Sort by fewest trucks, then by fewest total pallets
-            combinations.sort((a, b) => {
-                if (a.numTrucks !== b.numTrucks) {
-                    return a.numTrucks - b.numTrucks;
-                }
-                return a.totalPallets - b.totalPallets;
-            });
+            // Strategy 3: Each warehouse alone (fallback)
+            if (combinations.length === 0) {
+                const simpleOption = {
+                    type: 'multi',
+                    trucks: warehouseIds.map(id => {
+                        const whName = warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`;
+                        const whPallets = palletsByWarehouse[id];
+                        const { placedPallets } = packPallets(whPallets, false);
+                        
+                        const maxLinearMeter = placedPallets.reduce((max, p) => {
+                            const endPosition = p.x + (p.rotated ? p.width : p.length);
+                            return Math.max(max, endPosition);
+                        }, 0);
+                        
+                        return {
+                            warehouses: whName,
+                            pallets: whPallets.length,
+                            linearMeters: maxLinearMeter
+                        };
+                    }),
+                    numTrucks: warehouseIds.length,
+                    totalPallets: palletData.length
+                };
+                combinations.push(simpleOption);
+            }
+            
+            // Sort by fewest trucks
+            combinations.sort((a, b) => a.numTrucks - b.numTrucks);
             
             // Display results
             displayCombinations(combinations);
@@ -1104,7 +1153,7 @@ function displayCombinations(combinations) {
                     <p><strong>Numero mezzi:</strong> ${combo.numTrucks}</p>
                     ${combo.trucks.map((truck, i) => `
                         <p><strong>🚚 Mezzo ${i + 1}:</strong> ${truck.warehouses}</p>
-                        <p class="text-sm text-white/60">- ${truck.pallets} pallet</p>
+                        <p class="text-sm text-white/60">- ${truck.pallets} pallet | ${truck.linearMeters ? truck.linearMeters.toFixed(1) + 'm lineari' : ''}</p>
                     `).join('')}
                     <p><strong>Pallet totali:</strong> ${combo.totalPallets}</p>
                 </div>
@@ -1198,11 +1247,22 @@ function visualizeCombination(index) {
                 return warehouse ? warehouse.id : null;
             }).filter(id => id !== null);
             
-            const truckPallets = [];
-            truckIds.forEach(whId => {
-                const warehousePallets = palletData.filter(p => p.warehouseId === whId);
-                truckPallets.push(...warehousePallets);
-            });
+            // For the fallback case (single warehouse per truck), we need to match by name
+            let truckPallets = [];
+            if (truckIds.length > 0) {
+                truckIds.forEach(whId => {
+                    const warehousePallets = palletData.filter(p => p.warehouseId === whId);
+                    truckPallets.push(...warehousePallets);
+                });
+            } else {
+                // Try to find by name
+                warehouses.forEach(wh => {
+                    if (truck.warehouses.includes(wh.name)) {
+                        const warehousePallets = palletData.filter(p => p.warehouseId === wh.id);
+                        truckPallets.push(...warehousePallets);
+                    }
+                });
+            }
             
             const { placedPallets } = packPallets(truckPallets, true);
             
@@ -1319,4 +1379,143 @@ function returnToMultiView() {
     
     // Clear stored state
     previousMultiView = null;
+}
+
+// Save configuration to localStorage
+function saveConfiguration() {
+    const configName = document.getElementById('configName').value.trim();
+    if (!configName) {
+        alert('Inserisci un nome per la configurazione');
+        return;
+    }
+
+    const config = {
+        name: configName,
+        warehouses: []
+    };
+
+    // Collect warehouse and pallet data
+    warehouses.forEach((wh, whIndex) => {
+        const warehouseEl = document.getElementById(`warehouse-${whIndex}`);
+        if (!warehouseEl) return;
+
+        const nameInput = warehouseEl.querySelector('.warehouse-name');
+        const whName = nameInput ? nameInput.value : wh.name;
+
+        const warehouseData = {
+            name: whName,
+            pallets: []
+        };
+
+        const palletRows = warehouseEl.querySelectorAll('.pallet-row');
+        palletRows.forEach(row => {
+            const quantity = parseInt(row.querySelector('.pallet-qty').value) || 1;
+            const length = parseFloat(row.querySelector('.pallet-length').value) || 0;
+            const width = parseFloat(row.querySelector('.pallet-width').value) || 0;
+            const height = parseFloat(row.querySelector('.pallet-height').value) || 0;
+            const weight = parseFloat(row.querySelector('.pallet-weight').value) || 0;
+            const stackable = row.querySelector('.pallet-stackable').checked;
+
+            if (length > 0 && width > 0 && height > 0) {
+                warehouseData.pallets.push({
+                    quantity,
+                    length,
+                    width,
+                    height,
+                    weight,
+                    stackable
+                });
+            }
+        });
+
+        config.warehouses.push(warehouseData);
+    });
+
+    // Save to localStorage
+    const savedConfigs = JSON.parse(localStorage.getItem('palgoConfigs') || '[]');
+    const existingIndex = savedConfigs.findIndex(c => c.name === configName);
+    if (existingIndex >= 0) {
+        savedConfigs[existingIndex] = config;
+    } else {
+        savedConfigs.push(config);
+    }
+    localStorage.setItem('palgoConfigs', JSON.stringify(savedConfigs));
+
+    document.getElementById('configName').value = '';
+    loadSavedConfigs();
+    alert('Configurazione salvata!');
+}
+
+// Load saved configurations
+function loadSavedConfigs() {
+    const savedConfigs = JSON.parse(localStorage.getItem('palgoConfigs') || '[]');
+    const container = document.getElementById('savedConfigs');
+
+    if (savedConfigs.length === 0) {
+        container.innerHTML = '<p class="text-white/50 text-sm">Nessuna configurazione salvata</p>';
+        return;
+    }
+
+    container.innerHTML = savedConfigs.map((config, index) => `
+        <div class="flex items-center justify-between bg-white/5 rounded px-3 py-2">
+            <span class="text-white text-sm">${config.name}</span>
+            <div class="flex gap-2">
+                <button onclick="loadConfiguration(${index})" class="text-blue-400 hover:text-blue-300 text-xs">Carica</button>
+                <button onclick="deleteConfiguration(${index})" class="text-red-400 hover:text-red-300 text-xs">Elimina</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load a specific configuration
+function loadConfiguration(index) {
+    const savedConfigs = JSON.parse(localStorage.getItem('palgoConfigs') || '[]');
+    const config = savedConfigs[index];
+    if (!config) return;
+
+    // Clear current warehouses
+    warehouses = [];
+    document.getElementById('warehousesForm').innerHTML = '';
+
+    // Recreate warehouses
+    config.warehouses.forEach((whData, whIndex) => {
+        addWarehouse();
+        warehouses[whIndex].name = whData.name;
+
+        const warehouseEl = document.getElementById(`warehouse-${whIndex}`);
+        const nameInput = warehouseEl.querySelector('.warehouse-name');
+        if (nameInput) {
+            nameInput.value = whData.name;
+            nameInput.onchange = (e) => updateWarehouseName(whIndex, e.target.value);
+        }
+
+        // Remove default pallet row
+        const defaultRow = warehouseEl.querySelector('.pallet-row');
+        if (defaultRow) defaultRow.remove();
+
+        // Add pallet rows from config
+        whData.pallets.forEach(palletData => {
+            addPalletRow(whIndex);
+            const rows = warehouseEl.querySelectorAll('.pallet-row');
+            const lastRow = rows[rows.length - 1];
+            lastRow.querySelector('.pallet-qty').value = palletData.quantity;
+            lastRow.querySelector('.pallet-length').value = palletData.length;
+            lastRow.querySelector('.pallet-width').value = palletData.width;
+            lastRow.querySelector('.pallet-height').value = palletData.height;
+            lastRow.querySelector('.pallet-weight').value = palletData.weight;
+            lastRow.querySelector('.pallet-stackable').checked = palletData.stackable;
+        });
+    });
+
+    alert('Configurazione caricata!');
+}
+
+// Delete a configuration
+function deleteConfiguration(index) {
+    if (!confirm('Sei sicuro di voler eliminare questa configurazione?')) return;
+
+    const savedConfigs = JSON.parse(localStorage.getItem('palgoConfigs') || '[]');
+    savedConfigs.splice(index, 1);
+    localStorage.setItem('palgoConfigs', JSON.stringify(savedConfigs));
+    loadSavedConfigs();
 }
