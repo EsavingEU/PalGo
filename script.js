@@ -932,6 +932,7 @@ async function generateCombinations() {
                 }, 0);
                 
                 warehouseLinearMeters[whId] = maxLinearMeter;
+                console.log(`Warehouse ${whId}: ${whPallets.length} pallet, ${maxLinearMeter.toFixed(2)}m linear`);
             });
             
             // Step 2: Use bin packing to minimize number of trucks
@@ -940,6 +941,7 @@ async function generateCombinations() {
             
             // Sort warehouses by linear meters (largest first) - First Fit Decreasing
             const sortedWarehouseIds = [...warehouseIds].sort((a, b) => warehouseLinearMeters[b] - warehouseLinearMeters[a]);
+            console.log(`Sorted warehouse IDs: ${sortedWarehouseIds.join(', ')}`);
             
             // Try different numbers of trucks and find the minimum that works
             let minTrucks = warehouseIds.length; // Start with worst case (each warehouse in its own truck)
@@ -976,9 +978,12 @@ async function generateCombinations() {
                 
                 if (allFit) {
                     minTrucks = numTrucks;
+                    console.log(`Found solution with ${numTrucks} trucks`);
                     break;
                 }
             }
+            
+            console.log(`Minimum trucks needed: ${minTrucks}`);
             
             // Now find all valid solutions with minTrucks trucks
             // Try all combinations using backtracking (limited to avoid explosion)
@@ -986,8 +991,11 @@ async function generateCombinations() {
             
             function backtrack(index, currentTrucks) {
                 if (index === sortedWarehouseIds.length) {
-                    // All warehouses assigned
-                    validSolutions.push([...currentTrucks]);
+                    // All warehouses assigned - deep copy the solution
+                    validSolutions.push(currentTrucks.map(t => ({
+                        warehouseIds: [...t.warehouseIds],
+                        linearMeters: t.linearMeters
+                    })));
                     return;
                 }
                 
@@ -1011,6 +1019,8 @@ async function generateCombinations() {
             }));
             
             backtrack(0, initialTrucks);
+            
+            console.log(`Valid solutions found: ${validSolutions.length}`);
             
             // Remove duplicate solutions and build combinations
             const uniqueSolutions = [];
@@ -1060,6 +1070,33 @@ async function generateCombinations() {
                     totalPallets: totalPallets
                 });
             });
+            
+            // If no combinations found, fallback to each warehouse alone
+            if (combinations.length === 0) {
+                const simpleOption = {
+                    type: 'multi',
+                    trucks: warehouseIds.map(id => {
+                        const whName = warehouses.find(w => w.id === parseInt(id))?.name || `M${id}`;
+                        const whPallets = palletsByWarehouse[id];
+                        const { placedPallets } = packPallets(whPallets, false);
+                        
+                        const maxLinearMeter = placedPallets.reduce((max, p) => {
+                            const endPosition = p.x + (p.rotated ? p.width : p.length);
+                            return Math.max(max, endPosition);
+                        }, 0);
+                        
+                        return {
+                            warehouses: whName,
+                            warehouseIds: [id],
+                            pallets: whPallets.length,
+                            linearMeters: maxLinearMeter
+                        };
+                    }),
+                    numTrucks: warehouseIds.length,
+                    totalPallets: palletData.length
+                };
+                combinations.push(simpleOption);
+            }
             
             // Sort by linear meters utilization (more balanced is better)
             combinations.sort((a, b) => {
