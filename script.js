@@ -1027,12 +1027,19 @@ async function generateCombinations() {
             const seen = new Set();
             
             validSolutions.forEach(solution => {
-                const key = solution.map(t => t.warehouseIds.sort().join(',')).join('|');
-                if (!seen.has(key)) {
-                    seen.add(key);
+                // Create a canonical key by sorting each truck's warehouse IDs and then sorting the trucks
+                const canonicalKey = solution
+                    .map(t => t.warehouseIds.sort().join(','))
+                    .sort()
+                    .join('|');
+                
+                if (!seen.has(canonicalKey)) {
+                    seen.add(canonicalKey);
                     uniqueSolutions.push(solution);
                 }
             });
+            
+            console.log(`Unique solutions after deduplication: ${uniqueSolutions.length}`);
             
             // Build combination objects
             uniqueSolutions.forEach(solution => {
@@ -1264,6 +1271,9 @@ function visualizeCombination(index) {
         const spacing = TRUCK_LENGTH + 5;
         
         combo.trucks.forEach((truck, truckIndex) => {
+            // Skip empty trucks
+            if (truck.warehouseIds.length === 0) return;
+            
             // Use the warehouseIds stored in the combination
             const truckIds = truck.warehouseIds.map(id => parseInt(id));
             
@@ -1294,18 +1304,23 @@ function visualizeCombination(index) {
         });
         
         // Adjust camera to see all trucks
-        const totalWidth = combo.trucks.length * spacing;
+        const actualTruckCount = combo.trucks.filter(t => t.warehouseIds.length > 0).length;
+        const totalWidth = actualTruckCount * spacing;
         camera.position.set(totalWidth / 2 + 10, 25, 30);
         controls.target.set(totalWidth / 2, TRUCK_HEIGHT / 2, TRUCK_WIDTH / 2);
         controls.update();
         
         // Store truck positions for navigation
         window.truckPositions = [];
+        let truckIndex = 0;
         combo.trucks.forEach((truck, i) => {
-            window.truckPositions.push({
-                x: i * spacing + TRUCK_LENGTH / 2,
-                name: truck.warehouses
-            });
+            if (truck.warehouseIds.length > 0) {
+                window.truckPositions.push({
+                    x: truckIndex * spacing + TRUCK_LENGTH / 2,
+                    name: truck.warehouses
+                });
+                truckIndex++;
+            }
         });
         
         const resultsDiv = document.getElementById('results');
@@ -1313,9 +1328,11 @@ function visualizeCombination(index) {
         const currentContent = resultsContent.innerHTML;
         resultsContent.innerHTML = `
             <div class="bg-blue-500/20 rounded-lg p-3 mb-3 border border-blue-500/30">
-                <p class="text-blue-300 font-semibold">✅ Visualizzazione: ${combo.numTrucks} mezzi</p>
+                <p class="text-blue-300 font-semibold">✅ Visualizzazione: ${actualTruckCount} mezzi</p>
                 ${combo.trucks.map((truck, i) => `
-                    <p class="text-blue-200 text-sm">🚚 Mezzo ${i + 1}: ${truck.warehouses} (${truck.pallets} pallet, ${truck.linearMeters.toFixed(1)}m)</p>
+                    ${truck.warehouseIds.length > 0 ? `
+                        <p class="text-blue-200 text-sm">🚚 Mezzo ${i + 1}: ${truck.warehouses} (${truck.pallets} pallet, ${truck.linearMeters.toFixed(1)}m)</p>
+                    ` : ''}
                 `).join('')}
             </div>
             ${currentContent}
