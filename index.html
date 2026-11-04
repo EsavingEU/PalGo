@@ -53,9 +53,19 @@
                 <!-- Vincoli Combinazioni -->
                 <div class="mt-6 p-4 bg-white/10 rounded-lg border border-white/20">
                     <h3 class="text-white font-semibold mb-3">🔗 Vincoli Combinazioni</h3>
-                    <p class="text-white/60 text-sm mb-3">Seleziona i magazzini che devono essere ritirati insieme:</p>
-                    <div id="constraintsList" class="space-y-2 max-h-40 overflow-y-auto">
-                        <!-- Constraint checkboxes will appear here -->
+                    <p class="text-white/60 text-sm mb-3">Crea gruppi di magazzini che devono essere ritirati insieme:</p>
+                    
+                    <div class="mb-3">
+                        <div id="warehouseCheckboxes" class="space-y-2 max-h-32 overflow-y-auto mb-3">
+                            <!-- Warehouse checkboxes will appear here -->
+                        </div>
+                        <button onclick="createConstraintGroup()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm">
+                            + Crea Gruppo Vincolato
+                        </button>
+                    </div>
+                    
+                    <div id="constraintGroups" class="space-y-2 max-h-32 overflow-y-auto">
+                        <!-- Constraint groups will appear here -->
                     </div>
                 </div>
 

@@ -60,6 +60,9 @@ function addWarehouse() {
     
     // Add one pallet row by default
     addPalletRow(warehouseIndex);
+    
+    // Update constraints list
+    updateConstraintsList();
 }
 
 // Update warehouse name
@@ -87,6 +90,86 @@ function removeWarehouse(index) {
             wh.id = `warehouse-${i}`;
         });
     }
+    updateConstraintsList();
+}
+
+// Update constraints list UI
+function updateConstraintsList() {
+    const container = document.getElementById('warehouseCheckboxes');
+    if (!container) return;
+    
+    if (warehouses.length < 2) {
+        container.innerHTML = '<p class="text-white/50 text-sm">Servono almeno 2 magazzini per i vincoli</p>';
+        return;
+    }
+    
+    let html = '';
+    warehouses.forEach((wh, index) => {
+        html += `
+            <label class="flex items-center gap-2 text-white/80 text-sm">
+                <input type="checkbox" id="wh-check-${index}" class="warehouse-checkbox" data-warehouse-id="${index}">
+                <span>${wh.name}</span>
+            </label>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Create a constraint group from selected warehouses
+function createConstraintGroup() {
+    const selectedWarehouses = [];
+    document.querySelectorAll('.warehouse-checkbox:checked').forEach(checkbox => {
+        selectedWarehouses.push(parseInt(checkbox.dataset.warehouseId));
+    });
+    
+    if (selectedWarehouses.length < 2) {
+        alert('Seleziona almeno 2 magazzini per creare un gruppo vincolato');
+        return;
+    }
+    
+    // Add to constraint groups
+    const container = document.getElementById('constraintGroups');
+    const groupIndex = document.querySelectorAll('.constraint-group').length;
+    
+    const whNames = selectedWarehouses.map(id => warehouses[id]?.name || `M${id}`).join(' + ');
+    
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'constraint-group bg-purple-500/20 rounded px-3 py-2 flex items-center justify-between';
+    groupDiv.dataset.warehouses = selectedWarehouses.join(',');
+    groupDiv.innerHTML = `
+        <span class="text-white text-sm">${whNames}</span>
+        <button onclick="removeConstraintGroup(${groupIndex})" class="text-red-400 hover:text-red-300 text-xs">Rimuovi</button>
+    `;
+    
+    container.appendChild(groupDiv);
+    
+    // Clear checkboxes
+    document.querySelectorAll('.warehouse-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+// Remove a constraint group
+function removeConstraintGroup(index) {
+    const groups = document.querySelectorAll('.constraint-group');
+    if (groups[index]) {
+        groups[index].remove();
+        // Re-index remaining groups
+        document.querySelectorAll('.constraint-group').forEach((group, i) => {
+            group.querySelector('button').onclick = () => removeConstraintGroup(i);
+        });
+    }
+}
+
+// Get active constraint groups
+function getActiveConstraints() {
+    const constraints = [];
+    document.querySelectorAll('.constraint-group').forEach(group => {
+        const whIds = group.dataset.warehouses.split(',').map(id => parseInt(id));
+        constraints.push(whIds);
+    });
+    return constraints;
 }
 
 // Add a new pallet row to a specific warehouse
@@ -1002,7 +1085,34 @@ async function generateCombinations() {
                 const whId = sortedWarehouseIds[index];
                 const whLinearMeters = warehouseLinearMeters[whId];
                 
+                // Get active constraints
+                const constraints = getActiveConstraints();
+                
                 for (let t = 0; t < minTrucks; t++) {
+                    // Check if this assignment violates any constraint
+                    let violatesConstraint = false;
+                    
+                    for (const constraint of constraints) {
+                        const [constrainedId1, constrainedId2] = constraint;
+                        
+                        // If the current warehouse is in a constraint
+                        if (parseInt(whId) === constrainedId1 || parseInt(whId) === constrainedId2) {
+                            const otherConstrainedId = parseInt(whId) === constrainedId1 ? constrainedId2 : constrainedId1;
+                            
+                            // Check if the other constrained warehouse is already in a different truck
+                            const otherConstrainedInTruck = currentTrucks.findIndex(truck => 
+                                truck.warehouseIds.includes(String(otherConstrainedId))
+                            );
+                            
+                            if (otherConstrainedInTruck !== -1 && otherConstrainedInTruck !== t) {
+                                violatesConstraint = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (violatesConstraint) break;
+                    
                     if (currentTrucks[t].linearMeters + whLinearMeters <= truckCapacity) {
                         currentTrucks[t].warehouseIds.push(whId);
                         currentTrucks[t].linearMeters += whLinearMeters;
@@ -1270,14 +1380,9 @@ function visualizeCombination(index) {
         let offsetX = 0;
         const spacing = TRUCK_LENGTH + 5;
         
-        console.log('Visualizing combination:', combo);
-        console.log('Total trucks in combo:', combo.trucks.length);
-        
         combo.trucks.forEach((truck, truckIndex) => {
             // Skip empty trucks
             if (truck.warehouseIds.length === 0) return;
-            
-            console.log(`Truck ${truckIndex}: warehouseIds = ${truck.warehouseIds}, expected pallets = ${truck.pallets}`);
             
             // Use the warehouseIds stored in the combination
             const truckIds = truck.warehouseIds.map(id => parseInt(id));
@@ -1285,15 +1390,10 @@ function visualizeCombination(index) {
             const truckPallets = [];
             truckIds.forEach(whId => {
                 const warehousePallets = palletData.filter(p => p.warehouseId === whId);
-                console.log(`  Warehouse ${whId}: ${warehousePallets.length} pallets`);
                 truckPallets.push(...warehousePallets);
             });
             
-            console.log(`  Total pallets to pack: ${truckPallets.length}`);
-            
-            const { placedPallets, unplacedPallets } = packPallets(truckPallets, true);
-            
-            console.log(`  Placed: ${placedPallets.length}, Unplaced: ${unplacedPallets.length}`);
+            const { placedPallets } = packPallets(truckPallets, false);
             
             let maxLinearMeter = 0;
             placedPallets.forEach(p => {
