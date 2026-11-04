@@ -1,81 +1,258 @@
-/* Custom styles for PalGo */
+/* Custom styles for PalGo - Industrial Retro Warehouse */
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Oswald:wght@400;700&display=swap');
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Courier Prime', monospace;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(255, 140, 0, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 90% 80%, rgba(184, 134, 11, 0.05) 0%, transparent 50%);
 }
 
+h1 {
+    font-family: 'Oswald', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-shadow: 3px 3px 0 #d4a373, 6px 6px 0 rgba(0,0,0,0.3);
+}
+
+header p {
+    font-family: 'Courier Prime', monospace;
+    letter-spacing: 2px;
+    color: #d4a373;
+}
+
+/* Industrial card style */
+.bg-white\/10 {
+    background: linear-gradient(145deg, #2a2a2a, #1f1f1f);
+    border: 3px solid #d4a373;
+    box-shadow: 
+        4px 4px 0 #8b7355,
+        8px 8px 0 rgba(0,0,0,0.2);
+}
+
+/* Warehouse section */
+.warehouse-section {
+    background: linear-gradient(145deg, #2a2a2a, #1f1f1f);
+    border: 2px solid #8b7355;
+    padding: 16px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.warehouse-section::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    bottom: 4px;
+    border: 1px dashed #d4a373;
+    pointer-events: none;
+}
+
+.warehouse-section:hover {
+    border-color: #d4a373;
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 #8b7355;
+}
+
+.warehouse-name {
+    background: #1a1a1a;
+    border: 2px solid #8b7355;
+    padding: 4px 8px;
+    color: #d4a373;
+    font-family: 'Courier Prime', monospace;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.warehouse-name:focus {
+    outline: none;
+    border-color: #d4a373;
+    background: #2a2a2a;
+}
+
+/* Pallet row */
+.pallet-row {
+    background: rgba(139, 115, 85, 0.1);
+    border: 1px solid #8b7355;
+    padding: 10px;
+    transition: all 0.2s ease;
+}
+
+.pallet-row:hover {
+    background: rgba(212, 163, 115, 0.15);
+    border-color: #d4a373;
+}
+
+/* Inputs */
+.input-group input[type="number"],
+.input-group input[type="text"] {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #8b7355;
+    background: #1a1a1a;
+    color: #d4a373;
+    font-family: 'Courier Prime', monospace;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.input-group input[type="number"]:focus,
+.input-group input[type="text"]:focus {
+    outline: none;
+    border-color: #d4a373;
+    background: #2a2a2a;
+}
+
+.input-group input[type="number"]::placeholder,
+.input-group input[type="text"]::placeholder {
+    color: #8b7355;
+}
+
+/* Labels */
+.input-label {
+    color: #d4a373;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+/* Buttons */
+button {
+    font-family: 'Oswald', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border: 2px solid;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+button:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.3);
+}
+
+/* Primary action buttons */
+.bg-gradient-to-r {
+    background: linear-gradient(145deg, #d4a373, #8b7355);
+    border-color: #d4a373;
+    color: #1a1a1a;
+}
+
+.bg-gradient-to-r:hover {
+    background: linear-gradient(145deg, #8b7355, #d4a373);
+}
+
+/* Secondary buttons */
+.bg-blue-600,
+.bg-purple-600,
+.bg-green-600 {
+    background: #1a1a1a;
+    border-color: #d4a373;
+    color: #d4a373;
+}
+
+.bg-blue-600:hover,
+.bg-purple-600:hover,
+.bg-green-600:hover {
+    background: #2a2a2a;
+    border-color: #8b7355;
+}
+
+/* Remove button */
+.remove-btn {
+    background: #1a1a1a;
+    border: 2px solid #8b4513;
+    color: #cd5c5c;
+    font-family: 'Courier Prime', monospace;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+}
+
+.remove-btn:hover {
+    background: #2a1a1a;
+    border-color: #cd5c5c;
+    color: #ff6b6b;
+}
+
+/* 3D Container */
 #threeContainer {
     position: relative;
+    border: 3px solid #d4a373;
+    background: #0a0a0a;
+    box-shadow: 
+        inset 0 0 50px rgba(0,0,0,0.5),
+        4px 4px 0 #8b7355;
 }
 
 #threeContainer canvas {
     display: block;
 }
 
-.warehouse-section {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 16px;
-    transition: all 0.2s ease;
+/* Results sections */
+.bg-green-500\/20 {
+    background: rgba(139, 69, 19, 0.2);
+    border: 2px solid #228b22;
 }
 
-.warehouse-section:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
+.bg-blue-500\/20 {
+    background: rgba(70, 130, 180, 0.2);
+    border: 2px solid #4682b4;
 }
 
-.warehouse-name {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: white;
-    font-size: 16px;
+.bg-red-500\/20 {
+    background: rgba(139, 0, 0, 0.2);
+    border: 2px solid #8b0000;
 }
 
-.warehouse-name:focus {
-    outline: none;
-    border-color: #3b82f6;
-    background: rgba(255, 255, 255, 0.15);
+.bg-yellow-500\/20 {
+    background: rgba(218, 165, 32, 0.2);
+    border: 2px solid #b8860b;
 }
 
-.pallet-row {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 10px;
-    transition: all 0.2s ease;
+.bg-white\/10 {
+    background: rgba(26, 26, 26, 0.8);
+    border: 2px solid #8b7355;
 }
 
-.pallet-row:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.15);
+/* Constraint groups */
+.constraint-group {
+    background: rgba(139, 115, 85, 0.2);
+    border: 1px solid #d4a373;
 }
 
-.input-group {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-    gap: 8px;
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 12px;
 }
 
-.input-group input[type="number"] {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    font-size: 14px;
+::-webkit-scrollbar-track {
+    background: #1a1a1a;
+    border: 1px solid #8b7355;
 }
 
-.input-group input[type="number"]:focus {
-    outline: none;
-    border-color: #3b82f6;
-    background: rgba(255, 255, 255, 0.15);
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(145deg, #d4a373, #8b7355);
+    border: 2px solid #1a1a1a;
 }
 
-.input-group input[type="number"]::placeholder {
-    color: rgba(255, 255, 255, 0.4);
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(145deg, #8b7355, #d4a373);
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+    accent-color: #d4a373;
+}
+
+input[type="checkbox"] + label {
+    color: #d4a373;
+    font-family: 'Courier Prime', monospace;
 }
 
 .checkbox-group {
@@ -87,56 +264,10 @@ body {
 .checkbox-group input[type="checkbox"] {
     width: 18px;
     height: 18px;
-    accent-color: #3b82f6;
-}
-
-.checkbox-group label {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 14px;
-}
-
-.remove-btn {
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 14px;
-}
-
-.remove-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
-    border-color: rgba(239, 68, 68, 0.5);
-}
-
-.input-label {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 12px;
-    margin-bottom: 4px;
 }
 
 .input-label-with-checkbox {
     display: flex;
     align-items: center;
     gap: 4px;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
 }

@@ -9,116 +9,113 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 min-h-screen">
+<body class="min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
         <header class="text-center mb-8">
             <h1 class="text-5xl font-bold text-white mb-2">PalGo</h1>
-            <p class="text-blue-300 text-lg">Ottimizzatore Bilico Centinato 3D</p>
+            <p class="text-lg">Ottimizzatore Bilico Centinato 3D</p>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Form Magazzini -->
-            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+            <div class="bg-white/10 p-6">
                 <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
-                    <span class="bg-blue-500 rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">1</span>
+                    <span class="text-3xl mr-3">📦</span>
                     Magazzini / Ritiri
                 </h2>
 
-                <div id="warehousesForm" class="space-y-4">
+                <div id="warehousesForm" class="space-y-4 mb-4">
                     <!-- Warehouse sections will be added here -->
                 </div>
 
-                <button onclick="addWarehouse()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 flex items-center justify-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    Aggiungi Magazzino
+                <button onclick="addWarehouse()" class="w-full mb-6 flex items-center justify-center">
+                    <span class="mr-2">+</span> Aggiungi Magazzino
                 </button>
 
-                <!-- Salvataggio Configurazioni -->
-                <div class="mt-6 p-4 bg-white/10 rounded-lg border border-white/20">
-                    <h3 class="text-white font-semibold mb-3">💾 Configurazioni Salvate</h3>
-                    <div class="flex gap-2 mb-3">
-                        <input type="text" id="configName" placeholder="Nome configurazione" class="flex-1 bg-white/10 border border-white/30 rounded-lg px-3 py-2 text-white placeholder-white/50 text-sm">
-                        <button onclick="saveConfiguration()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm">
-                            Salva
-                        </button>
-                    </div>
-                    <div id="savedConfigs" class="space-y-2 max-h-40 overflow-y-auto">
-                        <!-- Saved configs will appear here -->
-                    </div>
-                </div>
-
-                <!-- Vincoli Combinazioni -->
-                <div class="mt-6 p-4 bg-white/10 rounded-lg border border-white/20">
-                    <h3 class="text-white font-semibold mb-3">🔗 Vincoli Combinazioni</h3>
-                    <p class="text-white/60 text-sm mb-3">Crea gruppi di magazzini che devono essere ritirati insieme:</p>
-                    
-                    <div class="mb-3">
-                        <div id="warehouseCheckboxes" class="space-y-2 max-h-32 overflow-y-auto mb-3">
-                            <!-- Warehouse checkboxes will appear here -->
-                        </div>
-                        <button onclick="createConstraintGroup()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm">
-                            + Crea Gruppo Vincolato
-                        </button>
-                    </div>
-                    
-                    <div id="constraintGroups" class="space-y-2 max-h-32 overflow-y-auto">
-                        <!-- Constraint groups will appear here -->
-                    </div>
-                </div>
-
-                <div class="mt-6 p-4 bg-yellow-500/20 rounded-lg border border-yellow-500/30">
-                    <h3 class="text-yellow-300 font-semibold mb-2">Limiti Bilico</h3>
-                    <ul class="text-yellow-200 text-sm space-y-1">
-                        <li>• Dimensioni: 13.6m × 2.5m</li>
-                        <li>• Altezza massima: 2.60m</li>
-                        <li>• Peso massimo: 25t</li>
-                    </ul>
-                </div>
-
-                <div class="mt-4 space-y-2">
-                    <button onclick="optimizeAndVisualize()" class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-4 px-6 rounded-lg transition duration-200 text-lg">
+                <!-- Azioni Principali -->
+                <div class="space-y-3 mb-6">
+                    <button onclick="optimizeAndVisualize()" class="w-full py-4 px-6 text-lg">
                         🚀 Ottimizza e Visualizza
                     </button>
-                    <button onclick="generateCombinations()" class="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200">
+                    <button onclick="generateCombinations()" class="w-full py-3 px-6">
                         🔗 Genera Combinazioni
                     </button>
-                    <button id="returnToMultiBtn" onclick="returnToMultiView()" class="w-full bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold py-3 px-6 rounded-lg transition duration-200 hidden">
+                    <button id="returnToMultiBtn" onclick="returnToMultiView()" class="w-full py-3 px-6 hidden">
                         🔄 Torna a Vista Multi-Magazzino
                     </button>
+                </div>
+
+                <!-- Impostazioni -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Salvataggio Configurazioni -->
+                    <div class="p-4">
+                        <h3 class="text-white font-semibold mb-3">💾 Configurazioni</h3>
+                        <div class="flex gap-2 mb-3">
+                            <input type="text" id="configName" placeholder="Nome..." class="flex-1 px-3 py-2 text-sm">
+                            <button onclick="saveConfiguration()" class="py-2 px-4 text-sm">
+                                Salva
+                            </button>
+                        </div>
+                        <div id="savedConfigs" class="space-y-2 max-h-32 overflow-y-auto">
+                            <!-- Saved configs will appear here -->
+                        </div>
+                    </div>
+
+                    <!-- Vincoli Combinazioni -->
+                    <div class="p-4">
+                        <h3 class="text-white font-semibold mb-3">🔗 Vincoli</h3>
+                        <div id="warehouseCheckboxes" class="space-y-2 max-h-20 overflow-y-auto mb-2">
+                            <!-- Warehouse checkboxes will appear here -->
+                        </div>
+                        <button onclick="createConstraintGroup()" class="w-full mb-2 py-2 px-4 text-sm">
+                            + Crea Gruppo
+                        </button>
+                        <div id="constraintGroups" class="space-y-2 max-h-20 overflow-y-auto">
+                            <!-- Constraint groups will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Limiti Bilico -->
+                <div class="mt-6 p-4">
+                    <h3 class="text-white font-semibold mb-2">⚙️ Limiti Bilico</h3>
+                    <ul class="text-sm space-y-1">
+                        <li>• 13.6m × 2.5m</li>
+                        <li>• Altezza max: 2.60m</li>
+                        <li>• Peso max: 25t</li>
+                    </ul>
                 </div>
             </div>
 
             <!-- 3D Visualization -->
-            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
+            <div class="bg-white/10 p-6">
                 <h2 class="text-2xl font-semibold text-white mb-6 flex items-center">
-                    <span class="bg-green-500 rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">2</span>
+                    <span class="text-3xl mr-3">🚚</span>
                     Visualizzazione 3D
                 </h2>
 
-                <div id="threeContainer" class="w-full h-[500px] bg-slate-800 rounded-xl overflow-hidden"></div>
+                <div id="threeContainer" class="w-full h-[500px]"></div>
 
                 <div id="results" class="mt-6 space-y-4 hidden">
-                    <div class="bg-green-500/20 rounded-lg p-4 border border-green-500/30">
-                        <h3 class="text-green-300 font-semibold mb-2">Risultati</h3>
-                        <div id="resultsContent" class="text-green-200 text-sm"></div>
+                    <div class="p-4">
+                        <h3 class="text-white font-semibold mb-2">Risultati</h3>
+                        <div id="resultsContent" class="text-sm"></div>
                     </div>
 
-                    <div id="errors" class="bg-red-500/20 rounded-lg p-4 border border-red-500/30 hidden">
-                        <h3 class="text-red-300 font-semibold mb-2">⚠️ Problemi</h3>
-                        <div id="errorsContent" class="text-red-200 text-sm"></div>
+                    <div id="errors" class="p-4 hidden">
+                        <h3 class="text-white font-semibold mb-2">⚠️ Problemi</h3>
+                        <div id="errorsContent" class="text-sm"></div>
                     </div>
                 </div>
 
-                <div class="mt-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                    <h4 class="text-blue-300 font-semibold text-sm mb-2">Controlli 3D</h4>
-                    <ul class="text-blue-200 text-xs space-y-1">
-                        <li>🖱️ <strong>Click pallet</strong>: Vedi dimensioni</li>
-                        <li>⬅️➡️ <strong>Frecce</strong>: Naviga tra mezzi</li>
-                        <li>🏠 <strong>Home</strong>: Vista panoramica</li>
-                        <li>🖱️ <strong>Trascina</strong>: Ruota vista</li>
+                <div class="mt-4 p-3">
+                    <h4 class="text-white font-semibold text-sm mb-2">Controlli 3D</h4>
+                    <ul class="text-xs space-y-1">
+                        <li>🖱️ <strong>Click</strong>: Dettagli pallet</li>
+                        <li>⬅️➡️ <strong>Frecce</strong>: Naviga mezzi</li>
+                        <li>🏠 <strong>Home</strong>: Panoramica</li>
+                        <li>🖱️ <strong>Trascina</strong>: Ruota</li>
                         <li>🔄 <strong>Rotella</strong>: Zoom</li>
                     </ul>
                 </div>
