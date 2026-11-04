@@ -63,7 +63,7 @@ header p {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 8px;
-    padding: 12px;
+    padding: 8px;
     transition: all 0.2s ease;
 }
 
@@ -72,16 +72,22 @@ header p {
     border-color: rgba(6, 182, 212, 0.2);
 }
 
-/* Inputs */
+/* Inputs - compact layout */
+.input-group {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
 .input-group input[type="number"],
 .input-group input[type="text"] {
     width: 100%;
-    padding: 10px 12px;
+    padding: 6px 8px;
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
     transition: all 0.2s ease;
 }
@@ -102,9 +108,9 @@ header p {
 /* Labels */
 .input-label {
     color: #94a3b8;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
-    margin-bottom: 6px;
+    margin-bottom: 2px;
 }
 
 /* Buttons */
