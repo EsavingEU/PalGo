@@ -1270,9 +1270,14 @@ function visualizeCombination(index) {
         let offsetX = 0;
         const spacing = TRUCK_LENGTH + 5;
         
+        console.log('Visualizing combination:', combo);
+        console.log('Total trucks in combo:', combo.trucks.length);
+        
         combo.trucks.forEach((truck, truckIndex) => {
             // Skip empty trucks
             if (truck.warehouseIds.length === 0) return;
+            
+            console.log(`Truck ${truckIndex}: warehouseIds = ${truck.warehouseIds}, expected pallets = ${truck.pallets}`);
             
             // Use the warehouseIds stored in the combination
             const truckIds = truck.warehouseIds.map(id => parseInt(id));
@@ -1280,10 +1285,15 @@ function visualizeCombination(index) {
             const truckPallets = [];
             truckIds.forEach(whId => {
                 const warehousePallets = palletData.filter(p => p.warehouseId === whId);
+                console.log(`  Warehouse ${whId}: ${warehousePallets.length} pallets`);
                 truckPallets.push(...warehousePallets);
             });
             
-            const { placedPallets } = packPallets(truckPallets, true);
+            console.log(`  Total pallets to pack: ${truckPallets.length}`);
+            
+            const { placedPallets, unplacedPallets } = packPallets(truckPallets, true);
+            
+            console.log(`  Placed: ${placedPallets.length}, Unplaced: ${unplacedPallets.length}`);
             
             let maxLinearMeter = 0;
             placedPallets.forEach(p => {
