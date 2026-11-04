@@ -182,33 +182,33 @@ function addPalletRow(warehouseIndex) {
     row.id = `pallet-${warehouseIndex}-${rowIndex}`;
     row.innerHTML = `
         <div class="flex justify-between items-center mb-2">
-            <span class="text-white/80 text-sm">Pallet #${rowIndex + 1}</span>
+            <div class="flex items-center gap-2">
+                <span class="text-white/80 text-sm">Pallet #${rowIndex + 1}</span>
+                <input type="checkbox" class="pallet-stackable" id="stackable-${warehouseIndex}-${rowIndex}" checked>
+                <label for="stackable-${warehouseIndex}-${rowIndex}" class="text-xs text-gray-400">Sovrapponibile</label>
+            </div>
             <button onclick="removePalletRow(${warehouseIndex}, ${rowIndex})" class="remove-btn text-xs py-1 px-2">X</button>
         </div>
         <div class="input-group">
             <div>
-                <div class="input-label">Quantità</div>
+                <div class="input-label">Qtà</div>
                 <input type="number" class="pallet-qty" id="quantity-${warehouseIndex}-${rowIndex}" placeholder="1" step="1" min="1" value="1">
             </div>
             <div>
-                <div class="input-label">Lunghezza (m)</div>
-                <input type="number" class="pallet-length" id="length-${warehouseIndex}-${rowIndex}" placeholder="1.2" step="0.01" min="0.1" value="1.2">
+                <div class="input-label">L (cm)</div>
+                <input type="number" class="pallet-length" id="length-${warehouseIndex}-${rowIndex}" placeholder="120" step="1" min="1" value="120">
             </div>
             <div>
-                <div class="input-label">Larghezza (m)</div>
-                <input type="number" class="pallet-width" id="width-${warehouseIndex}-${rowIndex}" placeholder="0.8" step="0.01" min="0.1" value="0.8">
+                <div class="input-label">P (cm)</div>
+                <input type="number" class="pallet-width" id="width-${warehouseIndex}-${rowIndex}" placeholder="80" step="1" min="1" value="80">
             </div>
             <div>
-                <div class="input-label">Altezza (m)</div>
-                <input type="number" class="pallet-height" id="height-${warehouseIndex}-${rowIndex}" placeholder="1.5" step="0.01" min="0.1" value="1.5">
+                <div class="input-label">H (cm)</div>
+                <input type="number" class="pallet-height" id="height-${warehouseIndex}-${rowIndex}" placeholder="110" step="1" min="1" value="110">
             </div>
             <div>
                 <div class="input-label">Peso (kg)</div>
                 <input type="number" class="pallet-weight" id="weight-${warehouseIndex}-${rowIndex}" placeholder="500" step="1" min="1" value="500">
-            </div>
-            <div class="checkbox-group">
-                <input type="checkbox" class="pallet-stackable" id="stackable-${warehouseIndex}-${rowIndex}" checked>
-                <label for="stackable-${warehouseIndex}-${rowIndex}">Sovrapponibile</label>
             </div>
         </div>
     `;
@@ -241,9 +241,9 @@ function collectAllPalletData() {
         
         rows.forEach((row, rowIndex) => {
             const quantity = parseInt(document.getElementById(`quantity-${warehouse.id}-${rowIndex}`).value) || 1;
-            const length = parseFloat(document.getElementById(`length-${warehouse.id}-${rowIndex}`).value) || 0;
-            const width = parseFloat(document.getElementById(`width-${warehouse.id}-${rowIndex}`).value) || 0;
-            const height = parseFloat(document.getElementById(`height-${warehouse.id}-${rowIndex}`).value) || 0;
+            const length = (parseFloat(document.getElementById(`length-${warehouse.id}-${rowIndex}`).value) || 0) / 100; // Convert cm to m
+            const width = (parseFloat(document.getElementById(`width-${warehouse.id}-${rowIndex}`).value) || 0) / 100; // Convert cm to m
+            const height = (parseFloat(document.getElementById(`height-${warehouse.id}-${rowIndex}`).value) || 0) / 100; // Convert cm to m
             const weight = parseFloat(document.getElementById(`weight-${warehouse.id}-${rowIndex}`).value) || 0;
             const stackable = document.getElementById(`stackable-${warehouse.id}-${rowIndex}`).checked;
             
@@ -1635,9 +1635,9 @@ function loadConfiguration(index) {
             const rows = warehouseEl.querySelectorAll('.pallet-row');
             const lastRow = rows[rows.length - 1];
             lastRow.querySelector('.pallet-qty').value = palletData.quantity;
-            lastRow.querySelector('.pallet-length').value = palletData.length;
-            lastRow.querySelector('.pallet-width').value = palletData.width;
-            lastRow.querySelector('.pallet-height').value = palletData.height;
+            lastRow.querySelector('.pallet-length').value = Math.round(palletData.length * 100); // Convert m to cm
+            lastRow.querySelector('.pallet-width').value = Math.round(palletData.width * 100); // Convert m to cm
+            lastRow.querySelector('.pallet-height').value = Math.round(palletData.height * 100); // Convert m to cm
             lastRow.querySelector('.pallet-weight').value = palletData.weight;
             lastRow.querySelector('.pallet-stackable').checked = palletData.stackable;
         });
